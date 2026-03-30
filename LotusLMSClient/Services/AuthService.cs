@@ -30,25 +30,40 @@ namespace LotusLMSClient.Services
                 { "_sand_platform", "3" },
                 { "_sand_readmin", "1" },
                 { "_sand_is_wan", "false" },
+                { "_sand_ga_sessionToken", string.Empty },
+                { "_sand_ga_browserToken", string.Empty },
                 { "_sand_domain", "truongson" },
-                { "_sand_web_url", "https://truongson.huelms.com/user/login/?logout=1" }
+                { "_sand_masked", string.Empty },
+                { "_sand_web_url", ApiService.WEB_LOGIN_URL },
+                { "_sand_device_uuid", "acd42ed7-b678-4704-b07c-7128b06e4f16" },
+                { "_sand_session_id", "2c710456-c150-42e1-85a6-f6e7ccbe7383" },
+                { "_sand_use_internal_network", "0" },
+                { "allow_cache_api_cdn", "1" },
+                { "_sand_user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36" },
+                { "_sand_ri", "11f85ebe6b47c10449b6b7a63f62455c" },
+                { "_sand_rit", "b93346eb488df0b749311e41637b5b94:qY5ll1uFeXNTM8+JGoyDGtutkEy9btf510RkFCzDnrJexiCQiKXo9THpuGntLFRD" }
             };
 
             try
             {
                 var response = await _apiService.PostFormDataAsync<LoginResponse>("/user/login", formData);
                 
-                if (response != null && !response.IsError)
+                if (response == null || !response.Success || response.Result == null)
                 {
-                    IsAuthenticated = true;
-                    CurrentToken = response.Token ?? "fake_demo_token";
-                    CurrentCccd = username; 
-                    CurrentName = !string.IsNullOrEmpty(response.Username) ? response.Username : "Học viên (Dummy)";
-                    _apiService.SetAuthToken(CurrentToken);
-                    return true;
+                    return false;
                 }
-                
-                return false;
+
+                if (response.Result.Pass != 1 || string.IsNullOrWhiteSpace(response.Result.Token))
+                {
+                    return false;
+                }
+
+                IsAuthenticated = true;
+                CurrentToken = response.Result.Token;
+                CurrentCccd = !string.IsNullOrWhiteSpace(response.Result.Lname) ? response.Result.Lname : username;
+                CurrentName = !string.IsNullOrWhiteSpace(response.Result.Name) ? response.Result.Name : CurrentCccd;
+                _apiService.SetAuthToken(CurrentToken);
+                return true;
             }
             catch (Exception ex)
             {

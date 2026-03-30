@@ -4,19 +4,28 @@ namespace LotusLMSClient.Models
 {
     public class LoginResponse
     {
-        [JsonProperty("token")]
-        public string Token { get; set; }
+        [JsonProperty("success")]
+        public bool Success { get; set; }
 
-        [JsonProperty("id")]
-        public int Id { get; set; }
-
-        [JsonProperty("username")]
-        public string Username { get; set; }
-        
-        [JsonProperty("error")]
-        public bool IsError { get; set; }
+        [JsonProperty("result")]
+        public LoginResult Result { get; set; }
 
         [JsonProperty("message")]
         public string Message { get; set; }
+    }
+
+    public class LoginResult
+    {
+        [JsonProperty("token")]
+        public string Token { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("lname")]
+        public string Lname { get; set; }
+
+        [JsonProperty("pass")]
+        public int Pass { get; set; }
     }
 }

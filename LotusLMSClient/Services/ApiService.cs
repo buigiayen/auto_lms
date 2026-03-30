@@ -10,15 +10,22 @@ namespace LotusLMSClient.Services
     {
         private readonly HttpClient _client;
         private const string BASE_URL = "https://staging-api.lotuslms.com";
+        public const string WEB_ORIGIN = "https://truongson.huelms.com";
+        public const string WEB_LOGIN_URL = WEB_ORIGIN + "/user/login?b=BLddg3cXu25CkuF7rOxu+n/sDKtXz5WrSYkcqndM47c=";
 
         public ApiService()
         {
             _client = new HttpClient();
             _client.BaseAddress = new Uri(BASE_URL);
-            _client.DefaultRequestHeaders.Add("Accept", "application/json, text/plain, */*");
-            _client.DefaultRequestHeaders.Add("User-Agent", "LotusLMS-DesktopClient/1.0");
-            _client.DefaultRequestHeaders.Add("Origin", "https://truongson.huelms.com");
-            _client.DefaultRequestHeaders.Add("Referer", "https://truongson.huelms.com/user/login/?logout=1");
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua-Platform", "\"Windows\"");
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9");
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("Accept", "application/json, text/plain, */*");
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua", "\"Not-A.Brand\";v=\"24\", \"Chromium\";v=\"146\"");
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua-Mobile", "?0");
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36");
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("Origin", WEB_ORIGIN);
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("Referer", WEB_LOGIN_URL);
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", "name=value");
         }
 
         public void SetAuthToken(string token)

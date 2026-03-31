@@ -12,12 +12,11 @@ namespace LotusLMSClient.UserControls
     {
         private readonly CourseService _courseService;
         private List<Course> _courses;
-        public Action<Course> OnCourseSelected { get; set; }
 
-        public CourseListControl()
+        public CourseListControl(AuthService authService)
         {
             InitializeComponent();
-            _courseService = new CourseService(new ApiService());
+            _courseService = new CourseService(authService.ApiService, authService);
             SetupUI();
             LoadCoursesAsync();
         }
@@ -26,8 +25,17 @@ namespace LotusLMSClient.UserControls
         {
             this.BackColor = ColorPalette.ContentBg;
             lblTitle.ForeColor = ColorPalette.TextPrimary;
+
+            // Buttons styling
             btnAll.BackColor = ColorPalette.Primary;
             btnAll.ForeColor = Color.White;
+            btnLearning.ForeColor = ColorPalette.TextSecondary;
+            btnCompleted.ForeColor = ColorPalette.TextSecondary;
+
+            // Search box styling
+            txtSearch.BackColor = ColorPalette.CardBg;
+            txtSearch.ForeColor = ColorPalette.TextPrimary;
+            txtSearch.BorderStyle = BorderStyle.FixedSingle;
         }
 
         private async void LoadCoursesAsync()
@@ -49,7 +57,7 @@ namespace LotusLMSClient.UserControls
         {
             Panel card = new Panel
             {
-                Width = 220,
+                Width = 320,
                 Height = 250,
                 BackColor = ColorPalette.CardBg,
                 Margin = new Padding(15)
@@ -70,17 +78,9 @@ namespace LotusLMSClient.UserControls
                 Font = new Font("Segoe UI", 12F, FontStyle.Bold),
                 Location = new Point(10, 130),
                 AutoSize = true,
-                MaximumSize = new Size(200, 0)
+                MaximumSize = new Size(400, 0)
             };
 
-            Label instructor = new Label
-            {
-                Text = "GV: " + course.InstructorName,
-                Font = new Font("Segoe UI", 10F),
-                ForeColor = ColorPalette.TextSecondary,
-                Location = new Point(10, 160),
-                AutoSize = true
-            };
 
             ProgressBar progress = new ProgressBar
             {
@@ -92,7 +92,7 @@ namespace LotusLMSClient.UserControls
 
             Button btnAction = new Button
             {
-                Text = course.Status == "Completed" ? "Xem lại" : "Tiếp tục học",
+                Text = course.Status == "Completed" ? "Xem lại" : "Tiếp tục học ngày hôm nay",
                 BackColor = course.Status == "Completed" ? ColorPalette.Success : ColorPalette.Primary,
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -101,18 +101,10 @@ namespace LotusLMSClient.UserControls
                 Height = 30
             };
             btnAction.FlatAppearance.BorderSize = 0;
-            // Dummy click event replaced by real callback
-            btnAction.Click += (s, e) => {
-                if (OnCourseSelected != null) {
-                    OnCourseSelected(course);
-                } else {
-                    MessageBox.Show($"Mở khóa học: {course.Name}");
-                }
-            };
+            btnAction.Click += (s, e) => MessageBox.Show($"Mở khóa học: {course.Name}");
 
             card.Controls.Add(btnAction);
             card.Controls.Add(progress);
-            card.Controls.Add(instructor);
             card.Controls.Add(title);
             card.Controls.Add(pic);
 

@@ -37,7 +37,7 @@ namespace LotusLMSClient.Services
             _client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
         }
 
-        public async Task<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, string> formData)
+        public async Task<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, string> formData, Dictionary<string, string> requestHeaders = null)
         {
             try
             {
@@ -47,7 +47,21 @@ namespace LotusLMSClient.Services
                     content.Add(new StringContent(kvp.Value), kvp.Key);
                 }
 
-                var response = await _client.PostAsync(endpoint, content);
+                using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+                {
+                    Content = content
+                };
+
+                if (requestHeaders != null)
+                {
+                    foreach (var header in requestHeaders)
+                    {
+                        request.Headers.Remove(header.Key);
+                        request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                    }
+                }
+
+                var response = await _client.SendAsync(request);
                 response.EnsureSuccessStatusCode();
 
                 var jsonString = await response.Content.ReadAsStringAsync();

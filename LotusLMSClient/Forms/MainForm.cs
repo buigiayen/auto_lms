@@ -105,26 +105,13 @@ namespace LotusLMSClient.Forms
         private void btnDashboard_Click(object sender, EventArgs e)
         {
             ActivateButton(sender);
-            LoadUserControl(new DashboardControl(_authService.CurrentName, _authService.CurrentCccd));
+            LoadUserControl(new DashboardControl(_authService));
         }
 
         private void btnCourses_Click(object sender, EventArgs e)
         {
             ActivateButton(sender);
-            var courseList = new CourseListControl();
-            courseList.OnCourseSelected = selectedCourse =>
-            {
-                var courseDetail = new CourseDetailControl(selectedCourse);
-                courseDetail.OnBack = () => LoadUserControl(courseList); // Go back without re-activation/fetching
-                courseDetail.OnLessonSelected = (course, lesson) =>
-                {
-                    // Open Lesson viewer
-                    var lessonViewer = new LessonViewerControl();
-                    LoadUserControl(lessonViewer);
-                };
-                LoadUserControl(courseDetail);
-            };
-            LoadUserControl(courseList);
+            LoadUserControl(new CourseListControl(_authService));
         }
         
         private void btnProfile_Click(object sender, EventArgs e)

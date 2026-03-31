@@ -27,5 +27,11 @@ namespace LotusLMSClient.Models
 
         [JsonProperty("pass")]
         public int Pass { get; set; }
+
+        [JsonProperty("iid")]
+        public int Iid { get; set; }
+
+        [JsonProperty("id")]
+        public string Id { get; set; }
     }
 }

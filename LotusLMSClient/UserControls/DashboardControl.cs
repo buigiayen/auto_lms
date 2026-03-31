@@ -1,78 +1,123 @@
 using System;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 using LotusLMSClient.Helpers;
+using LotusLMSClient.Models;
+using LotusLMSClient.Services;
 
 namespace LotusLMSClient.UserControls
 {
     public partial class DashboardControl : UserControl
     {
-        public DashboardControl(string name, string cccd)
+        private readonly CourseService _courseService;
+
+        public DashboardControl(AuthService authService)
         {
             InitializeComponent();
-            SetupUI(name, cccd);
+            _courseService = new CourseService(authService.ApiService, authService);
+            SetupUI(authService.CurrentName);
+            LoadOngoingCoursesAsync();
         }
 
-        private void SetupUI(string name, string cccd)
+        private void SetupUI(string name)
         {
-            this.BackColor = ColorPalette.ContentBg;
+            BackColor = ColorPalette.ContentBg;
+            AutoScroll = true;
             lblWelcome.Text = string.IsNullOrEmpty(name) ? "Xin chào 👋!" : $"Xin chào 👋 {name}!";
             lblWelcome.ForeColor = ColorPalette.TextPrimary;
-
-            // Setup Cards (Summary metrics)
-            SetupSummaryCard(panelCard1, "📚 5 Khóa học", ColorPalette.Primary);
-            SetupSummaryCard(panelCard2, "📅 3 Buổi học hôm nay", ColorPalette.Warning);
-            SetupSummaryCard(panelCard3, "📝 2 Bài thi sắp tới", ColorPalette.Error);
-            SetupSummaryCard(panelCard4, "✅ 85% Hoàn thành", ColorPalette.Success);
-            
-            // Populating UI with demo mock data
-            PopulateOngoingCourses();
-            PopulateUpcomingSessions();
+            flowLayoutPanelCourses.AutoScroll = true;
         }
 
-        private void SetupSummaryCard(Panel pnl, string text, Color accent)
+        private async void LoadOngoingCoursesAsync()
         {
-            pnl.BackColor = ColorPalette.CardBg;
-            // Border could be handled in OnPaint for custom shadow/rounding
-            Label lbl = new Label
+            flowLayoutPanelCourses.Controls.Clear();
+            var lblLoading = new Label
             {
-                Text = text,
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                ForeColor = accent,
+                Text = "Đang tải khóa học...",
+                Font = new Font("Segoe UI", 11F),
                 AutoSize = true,
-                Location = new Point(20, 25)
+                Margin = new Padding(5)
             };
-            pnl.Controls.Add(lbl);
-        }
+            flowLayoutPanelCourses.Controls.Add(lblLoading);
 
-        private void PopulateOngoingCourses()
-        {
-            // Flow layout mock setup
-            for (int i = 0; i < 3; i++)
+            try
             {
-                var pnlCourse = new Panel { Width = 200, Height = 100, BackColor = Color.White, Margin = new Padding(10) };
-                
-                var title = new Label { Text = "GPLX B2 - Module " + (i+1), Font = new Font("Segoe UI", 10F, FontStyle.Bold), AutoSize = true, Location = new Point(10, 10) };
-                var progress = new ProgressBar { Value = (i+1)*25, Width = 180, Height = 15, Location = new Point(10, 60) };
-                
-                pnlCourse.Controls.Add(title);
-                pnlCourse.Controls.Add(progress);
-                flowLayoutPanelCourses.Controls.Add(pnlCourse);
+                var courses = await _courseService.GetDashboardCoursesAsync();
+                flowLayoutPanelCourses.Controls.Clear();
+
+                if (courses.Count == 0)
+                {
+                    flowLayoutPanelCourses.Controls.Add(new Label
+                    {
+                        Text = "Không có khóa học",
+                        Font = new Font("Segoe UI", 11F),
+                        AutoSize = true,
+                        Margin = new Padding(5)
+                    });
+                    return;
+                }
+
+                foreach (var course in courses)
+                {
+                    RenderCourseCard(course);
+                }
+            }
+            catch
+            {
+                flowLayoutPanelCourses.Controls.Clear();
+                flowLayoutPanelCourses.Controls.Add(new Label
+                {
+                    Text = "Không tải được dữ liệu khóa học",
+                    Font = new Font("Segoe UI", 11F),
+                    ForeColor = ColorPalette.Error,
+                    AutoSize = true,
+                    Margin = new Padding(5)
+                });
             }
         }
 
-        private void PopulateUpcomingSessions()
+        private void RenderCourseCard(DashboardCourseItem course)
         {
-            dgvLichHoc.Rows.Add("28/03/2026", "08:00", "Lý thuyết GPLX - Buổi 5");
-            dgvLichHoc.Rows.Add("29/03/2026", "14:00", "Thực hành lái xe ngoài trời");
-            dgvLichHoc.Rows.Add("30/03/2026", "08:00", "Thi thử lý thuyết B2");
-            
-            dgvLichHoc.BackgroundColor = ColorPalette.CardBg;
-            dgvLichHoc.BorderStyle = BorderStyle.None;
-            dgvLichHoc.EnableHeadersVisualStyles = false;
-            dgvLichHoc.ColumnHeadersDefaultCellStyle.BackColor = ColorPalette.PrimaryDark;
-            dgvLichHoc.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            var panel = new Panel
+            {
+                Width = 320,
+                Height = 140,
+                BackColor = Color.White,
+                Margin = new Padding(5)
+            };
+
+            var lblName = new Label
+            {
+                Text = course.Name,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = ColorPalette.TextPrimary,
+                AutoSize = true,
+                MaximumSize = new Size(300, 0),
+                Location = new Point(10, 10)
+            };
+
+            var lblCp = new Label
+            {
+                Text = $"Tiến độ: {course.CpPercent:0.##}%",
+                Font = new Font("Segoe UI", 10F),
+                ForeColor = ColorPalette.Primary,
+                AutoSize = true,
+                Location = new Point(10, 65)
+            };
+
+            var lblP = new Label
+            {
+                Text = $"Giờ học: {course.PHours:0.##} giờ",
+                Font = new Font("Segoe UI", 10F),
+                ForeColor = ColorPalette.TextSecondary,
+                AutoSize = true,
+                Location = new Point(10, 90)
+            };
+
+            panel.Controls.Add(lblName);
+            panel.Controls.Add(lblCp);
+            panel.Controls.Add(lblP);
+            flowLayoutPanelCourses.Controls.Add(panel);
         }
     }
 }

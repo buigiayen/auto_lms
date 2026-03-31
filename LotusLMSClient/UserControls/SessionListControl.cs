@@ -20,14 +20,32 @@ namespace LotusLMSClient.UserControls
             lblTitle.ForeColor = ColorPalette.TextPrimary;
             lblSubtitle.ForeColor = ColorPalette.TextSecondary;
             
+            // Premium DataGridView Styling
             dgvSessions.BackgroundColor = ColorPalette.CardBg;
+            dgvSessions.GridColor = Color.FromArgb(230, 230, 230);
             dgvSessions.BorderStyle = BorderStyle.None;
+            dgvSessions.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
             dgvSessions.EnableHeadersVisualStyles = false;
+            
+            // Header styling
             dgvSessions.ColumnHeadersDefaultCellStyle.BackColor = ColorPalette.PrimaryDark;
             dgvSessions.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             dgvSessions.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            dgvSessions.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dgvSessions.ColumnHeadersHeight = 45;
+            
+            // Rows styling
+            dgvSessions.DefaultCellStyle.BackColor = Color.White;
+            dgvSessions.DefaultCellStyle.ForeColor = ColorPalette.TextPrimary;
             dgvSessions.DefaultCellStyle.Font = new Font("Segoe UI", 10F);
-            dgvSessions.RowTemplate.Height = 40;
+            dgvSessions.DefaultCellStyle.SelectionBackColor = Color.FromArgb(235, 245, 255);
+            dgvSessions.DefaultCellStyle.SelectionForeColor = ColorPalette.Primary;
+            
+            // Alternating rows for readability
+            dgvSessions.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(250, 250, 250);
+            
+            dgvSessions.RowTemplate.Height = 45;
+            dgvSessions.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
         }
 
         private void PopulateDummyData()

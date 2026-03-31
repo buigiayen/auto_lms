@@ -12,12 +12,11 @@ namespace LotusLMSClient.UserControls
     {
         private readonly CourseService _courseService;
         private List<Course> _courses;
-        public Action<Course> OnCourseSelected { get; set; }
 
-        public CourseListControl()
+        public CourseListControl(AuthService authService)
         {
             InitializeComponent();
-            _courseService = new CourseService(new ApiService());
+            _courseService = new CourseService(authService.ApiService, authService);
             SetupUI();
             LoadCoursesAsync();
         }
@@ -101,14 +100,7 @@ namespace LotusLMSClient.UserControls
                 Height = 30
             };
             btnAction.FlatAppearance.BorderSize = 0;
-            // Dummy click event replaced by real callback
-            btnAction.Click += (s, e) => {
-                if (OnCourseSelected != null) {
-                    OnCourseSelected(course);
-                } else {
-                    MessageBox.Show($"Mở khóa học: {course.Name}");
-                }
-            };
+            btnAction.Click += (s, e) => MessageBox.Show($"Mở khóa học: {course.Name}");
 
             card.Controls.Add(btnAction);
             card.Controls.Add(progress);

@@ -8,70 +8,128 @@ namespace LotusLMSClient.Services
     public class CourseService
     {
         private readonly ApiService _apiService;
+        private readonly AuthService _authService;
+        private int _enrolmentPlanIid = 30419695;
+        private bool _isEnrolmentPlanResolved;
+        private const string StudentCoursesRi = "90e6affb162954a72ccb4917ad194919";
+        private const string StudentCoursesRit = "3be8e77646c3da451a159ac537ce04df:ke7zTTwkVJf0SJeMDMEthbD60HcOUUTZRGZPN0bw2v4R0FhoeTvoh8rw5rvaYERv";
 
-        public CourseService(ApiService apiService)
+        public CourseService(ApiService apiService, AuthService authService = null)
         {
             _apiService = apiService;
+            _authService = authService;
+        }
+
+        public async Task<List<DashboardCourseItem>> GetDashboardCoursesAsync()
+        {
+            if (_authService == null || !_authService.IsAuthenticated)
+            {
+                return new List<DashboardCourseItem>();
+            }
+
+            var firstResponse = await FetchStudentCoursesResponseAsync(_enrolmentPlanIid);
+            var discoveredIid = ExtractEnrolmentPlanIid(firstResponse);
+
+            if (!_isEnrolmentPlanResolved && discoveredIid > 0)
+            {
+                _isEnrolmentPlanResolved = true;
+                if (discoveredIid != _enrolmentPlanIid)
+                {
+                    _enrolmentPlanIid = discoveredIid;
+                    firstResponse = await FetchStudentCoursesResponseAsync(_enrolmentPlanIid);
+                }
+            }
+
+            return MapDashboardCourses(firstResponse);
+        }
+
+        private async Task<StudentCoursesResponse> FetchStudentCoursesResponseAsync(int enrolmentPlanIid)
+        {
+            var endpoint = $"/student/api/get-student-courses-in-enrolment-plan-table-view?_sand_get_total=0&items_per_page=20&enrolment_plan_iid={enrolmentPlanIid}&expand%5B%5D=syllabus&expand%5B%5D=score_by_rubric&submit=1&page=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&_sand_ga_sessionToken=&_sand_ga_browserToken=&_sand_domain=truongson&_sand_masked=&_sand_session_id={AuthService.SandSessionId}&_sand_use_internal_network=0&allow_cache_api_cdn=1&_sand_user_agent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20Chrome%2F146.0.0.0%20Safari%2F537.36";
+            var formData = new Dictionary<string, string>
+            {
+                { "_sand_web_url", $"{ApiService.WEB_ORIGIN}/student/ep/{enrolmentPlanIid}" },
+                { "_sand_device_uuid", AuthService.SandDeviceUuid },
+                { "_sand_token", _authService.CurrentToken },
+                { "_sand_uiid", _authService.CurrentUserIid.ToString() },
+                { "_sand_uid", _authService.CurrentUserId },
+                { "_sand_ri", StudentCoursesRi },
+                { "_sand_rit", StudentCoursesRit }
+            };
+
+            var headers = new Dictionary<string, string>
+            {
+                { "Referer", $"{ApiService.WEB_ORIGIN}/student/ep/{enrolmentPlanIid}" }
+            };
+
+            return await _apiService.PostFormDataAsync<StudentCoursesResponse>(endpoint, formData, headers);
+        }
+
+        private static int ExtractEnrolmentPlanIid(StudentCoursesResponse response)
+        {
+            if (response?.Result == null)
+            {
+                return 0;
+            }
+
+            foreach (var item in response.Result)
+            {
+                if (item?.Course?.EnrolmentPlan != null && item.Course.EnrolmentPlan.Iid > 0)
+                {
+                    return item.Course.EnrolmentPlan.Iid;
+                }
+            }
+
+            return 0;
+        }
+
+        private static List<DashboardCourseItem> MapDashboardCourses(StudentCoursesResponse response)
+        {
+            if (response?.Result == null)
+            {
+                return new List<DashboardCourseItem>();
+            }
+
+            var courses = new List<DashboardCourseItem>();
+            foreach (var item in response.Result)
+            {
+                if (item?.Course == null)
+                {
+                    continue;
+                }
+
+                var name = !string.IsNullOrWhiteSpace(item.Course.Name) ? item.Course.Name : item.Name;
+                courses.Add(new DashboardCourseItem
+                {
+                    Name = name,
+                    CpPercent = item.Course.Cp,
+                    PHours = item.Course.P
+                });
+            }
+
+            return courses;
         }
 
         public async Task<List<Course>> GetUserCoursesAsync()
         {
-            // In a real app, we would fetch from _apiService
-            // Demo data for UI presentation
-            await Task.Delay(500); // Simulate network latency
+            var dashboardCourses = await GetDashboardCoursesAsync();
+            var courses = new List<Course>();
+            var id = 1;
 
-            var driverLessons = new List<Lesson>
+            foreach (var item in dashboardCourses)
             {
-                new Lesson { Id = 1, Title = "Khái niệm và quy tắc giao thông", ContentType = "Video", IsCompleted = true },
-                new Lesson { Id = 2, Title = "Hệ thống biển báo hiệu đường bộ", ContentType = "Video", IsCompleted = true },
-                new Lesson { Id = 3, Title = "Giải các thế sa hình", ContentType = "Video", IsCompleted = false },
-                new Lesson { Id = 4, Title = "Cấu tạo và sửa chữa thông thường", ContentType = "PDF", IsCompleted = false },
-                new Lesson { Id = 5, Title = "Đạo đức người lái xe", ContentType = "Html", IsCompleted = false }
-            };
+                courses.Add(new Course
+                {
+                    Id = id++,
+                    Name = item.Name,
+                    InstructorName = string.Empty,
+                    CompletedLessons = 0,
+                    TotalLessons = 0,
+                    ProgressPercent = item.CpPercent,
+                    Status = item.CpPercent >= 100 ? "Completed" : "Learning"
+                });
+            }
 
-            var mechanicLessons = new List<Lesson>
-            {
-                new Lesson { Id = 101, Title = "Động cơ đốt trong cơ bản", ContentType = "Video", IsCompleted = true },
-                new Lesson { Id = 102, Title = "Hệ thống điện xe ô tô", ContentType = "Video", IsCompleted = true },
-                new Lesson { Id = 103, Title = "Hệ thống truyền lực", ContentType = "PDF", IsCompleted = true }
-            };
-
-            var courses = new List<Course>
-            {
-                new Course
-                {
-                    Id = 1,
-                    Name = "Lý thuyết GPLX Hạng B2",
-                    InstructorName = "Nguyễn Văn A",
-                    TotalLessons = driverLessons.Count,
-                    CompletedLessons = 2,
-                    ProgressPercent = 40,
-                    Status = "Learning",
-                    Lessons = driverLessons
-                },
-                new Course
-                {
-                    Id = 2,
-                    Name = "An toàn giao thông",
-                    InstructorName = "Trần Văn B",
-                    TotalLessons = 10,
-                    CompletedLessons = 8,
-                    ProgressPercent = 80,
-                    Status = "Learning",
-                    Lessons = new List<Lesson>()
-                },
-                new Course
-                {
-                    Id = 3,
-                    Name = "Sửa chữa ôtô cơ bản",
-                    InstructorName = "Lê Thị C",
-                    TotalLessons = mechanicLessons.Count,
-                    CompletedLessons = 3,
-                    ProgressPercent = 100,
-                    Status = "Completed",
-                    Lessons = mechanicLessons
-                }
-            };
             return courses;
         }
     }

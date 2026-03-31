@@ -38,21 +38,25 @@ namespace LotusLMSClient.UserControls
             // 
             // lblTitle
             // 
+            this.lblTitle.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.lblTitle.AutoSize = true;
-            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 18F, System.Drawing.FontStyle.Bold);
-            this.lblTitle.Location = new System.Drawing.Point(20, 20);
+            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 20F, System.Drawing.FontStyle.Bold);
+            this.lblTitle.Location = new System.Drawing.Point(25, 20);
             this.lblTitle.Name = "lblTitle";
-            this.lblTitle.Size = new System.Drawing.Size(189, 32);
+            this.lblTitle.Size = new System.Drawing.Size(201, 37);
             this.lblTitle.TabIndex = 0;
             this.lblTitle.Text = "📅 Lịch học tập";
             // 
             // lblSubtitle
             // 
+            this.lblSubtitle.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.lblSubtitle.AutoSize = true;
-            this.lblSubtitle.Font = new System.Drawing.Font("Segoe UI", 10F);
-            this.lblSubtitle.Location = new System.Drawing.Point(22, 60);
+            this.lblSubtitle.Font = new System.Drawing.Font("Segoe UI", 11F);
+            this.lblSubtitle.Location = new System.Drawing.Point(27, 70);
             this.lblSubtitle.Name = "lblSubtitle";
-            this.lblSubtitle.Size = new System.Drawing.Size(360, 19);
+            this.lblSubtitle.Size = new System.Drawing.Size(409, 20);
             this.lblSubtitle.TabIndex = 1;
             this.lblSubtitle.Text = "Theo dõi các buổi học tập trung Offline và Online tại đây.";
             // 
@@ -60,6 +64,9 @@ namespace LotusLMSClient.UserControls
             // 
             this.dgvSessions.AllowUserToAddRows = false;
             this.dgvSessions.AllowUserToDeleteRows = false;
+            this.dgvSessions.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
             this.dgvSessions.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
             this.dgvSessions.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.dgvSessions.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
@@ -69,11 +76,11 @@ namespace LotusLMSClient.UserControls
             this.ColSubject,
             this.ColTeacher,
             this.ColStatus});
-            this.dgvSessions.Location = new System.Drawing.Point(26, 100);
+            this.dgvSessions.Location = new System.Drawing.Point(26, 110);
             this.dgvSessions.Name = "dgvSessions";
             this.dgvSessions.ReadOnly = true;
             this.dgvSessions.RowHeadersVisible = false;
-            this.dgvSessions.Size = new System.Drawing.Size(750, 550);
+            this.dgvSessions.Size = new System.Drawing.Size(748, 560);
             this.dgvSessions.TabIndex = 2;
             // 
             // ColDate

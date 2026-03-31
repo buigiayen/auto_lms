@@ -25,8 +25,17 @@ namespace LotusLMSClient.UserControls
         {
             this.BackColor = ColorPalette.ContentBg;
             lblTitle.ForeColor = ColorPalette.TextPrimary;
+
+            // Buttons styling
             btnAll.BackColor = ColorPalette.Primary;
             btnAll.ForeColor = Color.White;
+            btnLearning.ForeColor = ColorPalette.TextSecondary;
+            btnCompleted.ForeColor = ColorPalette.TextSecondary;
+
+            // Search box styling
+            txtSearch.BackColor = ColorPalette.CardBg;
+            txtSearch.ForeColor = ColorPalette.TextPrimary;
+            txtSearch.BorderStyle = BorderStyle.FixedSingle;
         }
 
         private async void LoadCoursesAsync()

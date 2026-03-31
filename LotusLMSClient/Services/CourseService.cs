@@ -25,10 +25,21 @@ namespace LotusLMSClient.Services
             {
                 return new List<DashboardCourseItem>();
             }
-                var enrolmentPlansResponse = await FetchStudentEnrolmentPlansResponseAsync();
-                _enrolmentPlanIid = enrolmentPlansResponse.Result[0].Iid ;
+
+            var enrolmentPlansResponse = await FetchStudentEnrolmentPlansResponseAsync();
+            if (enrolmentPlansResponse == null || enrolmentPlansResponse.Result == null || enrolmentPlansResponse.Result.Count == 0)
+            {
+                return new List<DashboardCourseItem>();
+            }
+
+            _enrolmentPlanIid = enrolmentPlansResponse.Result[0].Iid;
 
             var response = await FetchStudentCoursesResponseAsync(_enrolmentPlanIid);
+            if (response == null)
+            {
+                return new List<DashboardCourseItem>();
+            }
+
             return MapDashboardCourses(response);
         }
 

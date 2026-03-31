@@ -14,6 +14,24 @@ namespace LotusLMSClient.Models
         [JsonProperty("name")]
         public string Name { get; set; }
 
+        [JsonProperty("iid")]
+        public int Iid { get; set; }
+
+        [JsonProperty("course")]
+        public StudentCourseInfo Course { get; set; }
+
+        [JsonProperty("children")]
+        public List<StudentCourseChild> Children { get; set; }
+    }
+
+    public class StudentCourseChild
+    {
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("iid")]
+        public string Iid { get; set; }
+
         [JsonProperty("course")]
         public StudentCourseInfo Course { get; set; }
     }
@@ -44,5 +62,17 @@ namespace LotusLMSClient.Models
         public string Name { get; set; }
         public double CpPercent { get; set; }
         public double PHours { get; set; }
+    }
+
+    public class StudentEnrolmentPlansResponse
+    {
+        [JsonProperty("result")]
+        public List<StudentEnrolmentPlanItem> Result { get; set; }
+    }
+
+    public class StudentEnrolmentPlanItem
+    {
+        [JsonProperty("iid")]
+        public int Iid { get; set; }
     }
 }

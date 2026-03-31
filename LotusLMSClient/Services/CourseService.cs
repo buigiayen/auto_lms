@@ -26,7 +26,8 @@ namespace LotusLMSClient.Services
                 return new List<DashboardCourseItem>();
             }
                 var enrolmentPlansResponse = await FetchStudentEnrolmentPlansResponseAsync();
-                _enrolmentPlanIid = enrolmentPlansResponse.Result[0].Iid;
+                _enrolmentPlanIid = enrolmentPlansResponse.Result[0].Iid ;
+
             var response = await FetchStudentCoursesResponseAsync(_enrolmentPlanIid);
             return MapDashboardCourses(response);
         }
@@ -128,7 +129,7 @@ namespace LotusLMSClient.Services
                     CompletedLessons = 0,
                     TotalLessons = 0,
                     ProgressPercent = item.CpPercent,
-                    Status = item.CpPercent >= 100 ? "Completed" : "Learning"
+                    Status = item.CpPercent >= 71 ? "Completed" : "Learning"
                 });
             }
 

@@ -48,7 +48,7 @@ namespace LotusLMSClient.UserControls
         {
             Panel card = new Panel
             {
-                Width = 220,
+                Width = 320,
                 Height = 250,
                 BackColor = ColorPalette.CardBg,
                 Margin = new Padding(15)
@@ -69,17 +69,9 @@ namespace LotusLMSClient.UserControls
                 Font = new Font("Segoe UI", 12F, FontStyle.Bold),
                 Location = new Point(10, 130),
                 AutoSize = true,
-                MaximumSize = new Size(200, 0)
+                MaximumSize = new Size(400, 0)
             };
 
-            Label instructor = new Label
-            {
-                Text = "GV: " + course.InstructorName,
-                Font = new Font("Segoe UI", 10F),
-                ForeColor = ColorPalette.TextSecondary,
-                Location = new Point(10, 160),
-                AutoSize = true
-            };
 
             ProgressBar progress = new ProgressBar
             {
@@ -91,7 +83,7 @@ namespace LotusLMSClient.UserControls
 
             Button btnAction = new Button
             {
-                Text = course.Status == "Completed" ? "Xem lại" : "Tiếp tục học",
+                Text = course.Status == "Completed" ? "Xem lại" : "Tiếp tục học ngày hôm nay",
                 BackColor = course.Status == "Completed" ? ColorPalette.Success : ColorPalette.Primary,
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -104,7 +96,6 @@ namespace LotusLMSClient.UserControls
 
             card.Controls.Add(btnAction);
             card.Controls.Add(progress);
-            card.Controls.Add(instructor);
             card.Controls.Add(title);
             card.Controls.Add(pic);
 

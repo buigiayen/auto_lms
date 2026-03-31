@@ -22,8 +22,10 @@ namespace LotusLMSClient.UserControls
         private void SetupUI(string name)
         {
             BackColor = ColorPalette.ContentBg;
+            AutoScroll = true;
             lblWelcome.Text = string.IsNullOrEmpty(name) ? "Xin chào 👋!" : $"Xin chào 👋 {name}!";
             lblWelcome.ForeColor = ColorPalette.TextPrimary;
+            flowLayoutPanelCourses.AutoScroll = true;
         }
 
         private async void LoadOngoingCoursesAsync()
@@ -34,7 +36,7 @@ namespace LotusLMSClient.UserControls
                 Text = "Đang tải khóa học...",
                 Font = new Font("Segoe UI", 11F),
                 AutoSize = true,
-                Margin = new Padding(10)
+                Margin = new Padding(5)
             };
             flowLayoutPanelCourses.Controls.Add(lblLoading);
 
@@ -50,7 +52,7 @@ namespace LotusLMSClient.UserControls
                         Text = "Không có khóa học",
                         Font = new Font("Segoe UI", 11F),
                         AutoSize = true,
-                        Margin = new Padding(10)
+                        Margin = new Padding(5)
                     });
                     return;
                 }
@@ -69,7 +71,7 @@ namespace LotusLMSClient.UserControls
                     Font = new Font("Segoe UI", 11F),
                     ForeColor = ColorPalette.Error,
                     AutoSize = true,
-                    Margin = new Padding(10)
+                    Margin = new Padding(5)
                 });
             }
         }
@@ -78,10 +80,10 @@ namespace LotusLMSClient.UserControls
         {
             var panel = new Panel
             {
-                Width = 220,
-                Height = 120,
+                Width = 320,
+                Height = 140,
                 BackColor = Color.White,
-                Margin = new Padding(10)
+                Margin = new Padding(5)
             };
 
             var lblName = new Label
@@ -90,13 +92,13 @@ namespace LotusLMSClient.UserControls
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = ColorPalette.TextPrimary,
                 AutoSize = true,
-                MaximumSize = new Size(200, 0),
+                MaximumSize = new Size(300, 0),
                 Location = new Point(10, 10)
             };
 
             var lblCp = new Label
             {
-                Text = $"CP: {course.CpPercent:0.##}%",
+                Text = $"Tiến độ: {course.CpPercent:0.##}%",
                 Font = new Font("Segoe UI", 10F),
                 ForeColor = ColorPalette.Primary,
                 AutoSize = true,
@@ -105,7 +107,7 @@ namespace LotusLMSClient.UserControls
 
             var lblP = new Label
             {
-                Text = $"P: {course.PHours:0.##} giờ",
+                Text = $"Giờ học: {course.PHours:0.##} giờ",
                 Font = new Font("Segoe UI", 10F),
                 ForeColor = ColorPalette.TextSecondary,
                 AutoSize = true,

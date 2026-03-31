@@ -26,21 +26,6 @@ namespace LotusLMSClient.UserControls
             lblWelcome.ForeColor = ColorPalette.TextPrimary;
         }
 
-        private void SetupSummaryCard(Panel pnl, string text, Color accent)
-        {
-            pnl.BackColor = ColorPalette.CardBg;
-            pnl.Controls.Clear();
-            var lbl = new Label
-            {
-                Text = text,
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                ForeColor = accent,
-                AutoSize = true,
-                Location = new Point(20, 25)
-            };
-            pnl.Controls.Add(lbl);
-        }
-
         private async void LoadOngoingCoursesAsync()
         {
             flowLayoutPanelCourses.Controls.Clear();

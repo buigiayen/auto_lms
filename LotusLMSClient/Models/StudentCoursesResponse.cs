@@ -46,6 +46,8 @@ namespace LotusLMSClient.Models
 
         [JsonProperty("p")]
         public double P { get; set; }
+        [JsonProperty("pf")]
+        public double PF { get; set; }
 
         [JsonProperty("enrolment_plan")]
         public StudentEnrolmentPlan EnrolmentPlan { get; set; }
@@ -62,6 +64,7 @@ namespace LotusLMSClient.Models
         public string Name { get; set; }
         public double CpPercent { get; set; }
         public double PHours { get; set; }
+        public  double pf { get; set; }
     }
 
     public class StudentEnrolmentPlansResponse

@@ -95,7 +95,8 @@ namespace LotusLMSClient.Services
                     {
                         Name = name,
                         CpPercent = item.Course.Cp,
-                        PHours = item.Course.P
+                        PHours = item.Course.P,
+                        pf = item.Course.PF,
                     });
                 }
 
@@ -116,7 +117,8 @@ namespace LotusLMSClient.Services
                     {
                         Name = childName,
                         CpPercent = child.Course.Cp,
-                        PHours = child.Course.P
+                        PHours = child.Course.P,
+                        pf = child.Course.PF,
                     });
                 }
             }
@@ -140,7 +142,7 @@ namespace LotusLMSClient.Services
                     CompletedLessons = 0,
                     TotalLessons = 0,
                     ProgressPercent = item.CpPercent,
-                    Status = item.CpPercent >= 71 ? "Completed" : "Learning"
+                    Status = item.pf ==1 ? "Completed" : "Learning"
                 });
             }
 

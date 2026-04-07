@@ -59,6 +59,7 @@ namespace LotusLMSClient.Models
 
     public class DashboardCourseItem
     {
+        public int Iid { get; set; }
         public string Name { get; set; }
         public double CpPercent { get; set; }
         public double PHours { get; set; }

@@ -111,7 +111,29 @@ namespace LotusLMSClient.Forms
         private void btnCourses_Click(object sender, EventArgs e)
         {
             ActivateButton(sender);
-            LoadUserControl(new CourseListControl(_authService));
+            LoadCourseList();
+        }
+
+        private void LoadCourseList()
+        {
+            var courseList = new CourseListControl(_authService);
+
+            // Khi API get-detail-learning-time trả về → hiển thị phân cấp
+            courseList.OnCourseDetailLoaded = (course, jData) =>
+            {
+                var detail = new CourseDetailControl(course, jData);
+                // Nút Quay lại → quay về danh sách khóa học
+                detail.OnBack = () => LoadCourseList();
+                LoadUserControl(detail);
+            };
+
+            // Giữ lại fallback cũ nếu cần
+            courseList.OnCourseSelected = (course) =>
+            {
+                LoadUserControl(new SessionListControl());
+            };
+
+            LoadUserControl(courseList);
         }
         
         private void btnProfile_Click(object sender, EventArgs e)
@@ -123,7 +145,6 @@ namespace LotusLMSClient.Forms
         private void btnExams_Click(object sender, EventArgs e)
         {
             ActivateButton(sender);
-            LoadUserControl(new SessionListControl()); // Reusing it as a placeholder or could show an under construction message
             // MessageBox.Show("Tính năng Đang phát triển");
         }
 

@@ -15,7 +15,13 @@ namespace LotusLMSClient.Services
 
         public ApiService()
         {
-            _client = new HttpClient();
+
+            var handler = new HttpClientHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.GZip |
+                                 System.Net.DecompressionMethods.Deflate
+            };
+            _client = new HttpClient(handler);
             _client.BaseAddress = new Uri(BASE_URL);
             _client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua-Platform", "\"Windows\"");
             _client.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9");
@@ -35,6 +41,33 @@ namespace LotusLMSClient.Services
                 _client.DefaultRequestHeaders.Remove("Authorization");
             }
             _client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+        }
+
+        public async Task<T> GetAsync<T>(string endpoint, Dictionary<string, string> requestHeaders = null)
+        {
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+
+                if (requestHeaders != null)
+                {
+                    foreach (var header in requestHeaders)
+                    {
+                        request.Headers.Remove(header.Key);
+                        request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                    }
+                }
+
+                var response = await _client.SendAsync(request);
+                response.EnsureSuccessStatusCode();
+
+                var jsonString = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<T>(jsonString);
+            }
+            catch (Exception ex)
+            {
+                throw new ApplicationException($"Lỗi kết nối tới server (GET): {ex.Message}", ex);
+            }
         }
 
         public async Task<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, string> formData, Dictionary<string, string> requestHeaders = null)
@@ -64,6 +97,7 @@ namespace LotusLMSClient.Services
                 var response = await _client.SendAsync(request);
                 response.EnsureSuccessStatusCode();
 
+             
                 var jsonString = await response.Content.ReadAsStringAsync();
                 return JsonConvert.DeserializeObject<T>(jsonString);
             }

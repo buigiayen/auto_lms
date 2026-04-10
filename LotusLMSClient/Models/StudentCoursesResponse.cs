@@ -41,6 +41,9 @@ namespace LotusLMSClient.Models
         [JsonProperty("name")]
         public string Name { get; set; }
 
+        [JsonProperty("iid")]
+        public int Iid { get; set; }
+
         [JsonProperty("cp")]
         public double Cp { get; set; }
 
@@ -61,6 +64,7 @@ namespace LotusLMSClient.Models
 
     public class DashboardCourseItem
     {
+        public int Iid { get; set; }
         public string Name { get; set; }
         public double CpPercent { get; set; }
         public double PHours { get; set; }

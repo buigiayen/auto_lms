@@ -1,12 +1,17 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Collections.Generic;
+using System.Linq;
 using LotusLMSClient.Helpers;
+using LotusLMSClient.Models;
 
 namespace LotusLMSClient.UserControls
 {
     public partial class SessionListControl : UserControl
     {
+        public Action<dynamic> OnLessonSelected;
+
         public SessionListControl()
         {
             InitializeComponent();
@@ -46,14 +51,121 @@ namespace LotusLMSClient.UserControls
             
             dgvSessions.RowTemplate.Height = 45;
             dgvSessions.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+
+            // Column Adjustments for full visibility
+            ColDate.HeaderText = "Tên bài học";
+            ColDate.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            ColDate.MinimumWidth = 200;
+
+            ColSubject.HeaderText = "Thời gian";
+            ColSubject.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            ColSubject.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            ColSubject.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+            // Let the name column fill remaining space
+            dgvSessions.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            ColDate.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill; 
+            ColDate.FillWeight = 70; // Give name column more weight
+            
+            ColSubject.AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+
+            dgvSessions.CellClick += DgvSessions_CellClick;
+        }
+
+        private void DgvSessions_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+            {
+                var tag = dgvSessions.Rows[e.RowIndex].Tag;
+                if (tag != null)
+                {
+                    OnLessonSelected?.Invoke(tag);
+                }
+            }
+        }
+
+        public void DisplayTrackTimeData(SubjectDetails details)
+        {
+            dgvSessions.Rows.Clear();
+            if (details?.result?.children == null) return;
+
+            AddItemsRecursive(details.result.children, 0);
+        }
+
+        private void AddItemsRecursive(dynamic children, int depth)
+        {
+            if (children == null) return;
+
+            foreach (var item in children)
+            {
+                string indent = new string(' ', depth * 4);
+                string timeStr = "";
+                string statusStr = "";
+
+                // Get metrics if they exist
+                try
+                {
+                    int actual = (int)item.actual_learning_time;
+                    int min = (int)item.min_learning_time;
+                    
+                    if (min > 0)
+                    {
+                        timeStr = $"{FormatTime(actual)} / {FormatTime(min)}";
+                    }
+                }
+                catch { }
+
+                // Add Row: Name, NType (hidden), Room (hidden), TimeSpent, Teacher (hidden)
+                int rowIndex = dgvSessions.Rows.Add(
+                    indent + item.name, 
+                    timeStr
+                );
+                dgvSessions.Rows[rowIndex].Tag = item;
+
+                // Recursively add children if any exist
+                try
+                {
+                    if (item.children != null)
+                    {
+                        AddItemsRecursive(item.children, depth + 1);
+                    }
+                }
+                catch { }
+            }
+        }
+
+        private string FormatTime(int totalSeconds)
+        {
+            TimeSpan t = TimeSpan.FromSeconds(totalSeconds);
+            if (t.TotalHours >= 1)
+                return $"{(int)t.TotalHours:D2}:{t.Minutes:D2}:{t.Seconds:D2}";
+            return $"{t.Minutes:D2}:{t.Seconds:D2}";
+        }
+
+        public void RefreshTrackTimeData()
+        {
+            foreach (DataGridViewRow row in dgvSessions.Rows)
+            {
+                if (row.Tag != null)
+                {
+                    dynamic item = row.Tag;
+                    try
+                    {
+                        int actual = (int)item.actual_learning_time;
+                        int min = (int)item.min_learning_time;
+                        if (min > 0)
+                        {
+                            row.Cells[1].Value = $"{FormatTime(actual)} / {FormatTime(min)}";
+                        }
+                    }
+                    catch { }
+                }
+            }
         }
 
         private void PopulateDummyData()
         {
-            dgvSessions.Rows.Add("28/03/2026", "08:00 - 11:30", "Phòng 102", "Lý thuyết GPLX B2 - Đạo đức người lái", "Nguyễn Văn A", "Chưa bắt đầu");
-            dgvSessions.Rows.Add("29/03/2026", "13:30 - 17:00", "Sân Tập A", "Thực hành Lái xe Cơ bản", "Phạm Văn B", "Sắp diễn ra");
-            dgvSessions.Rows.Add("02/04/2026", "08:00 - 10:00", "Phòng Máy 1", "Học luật trên App Simulator", "Lê Văn C", "Chưa bắt đầu");
-            dgvSessions.Rows.Add("05/04/2026", "14:00 - 16:30", "Offline", "Hướng dẫn kiểm tra kỹ thuật xe", "Trần Văn D", "Đã điểm danh");
+            dgvSessions.Rows.Add("Dữ liệu mẫu bài học", "00:00 / 01:00:00");
         }
     }
 }

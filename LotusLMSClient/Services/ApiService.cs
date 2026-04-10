@@ -15,7 +15,11 @@ namespace LotusLMSClient.Services
 
         public ApiService()
         {
-            _client = new HttpClient();
+            var handler = new HttpClientHandler
+            {
+                AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
+            };
+            _client = new HttpClient(handler);
             _client.BaseAddress = new Uri(BASE_URL);
             _client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua-Platform", "\"Windows\"");
             _client.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.9");

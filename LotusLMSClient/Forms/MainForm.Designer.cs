@@ -11,6 +11,7 @@ namespace LotusLMSClient.Forms
         private System.Windows.Forms.Button btnExams;
         private System.Windows.Forms.Button btnQnA;
         private System.Windows.Forms.Button btnProfile;
+        private System.Windows.Forms.Button btnLogs;
         private System.Windows.Forms.Button btnLogout;
         private System.Windows.Forms.Panel panelHeader;
         private System.Windows.Forms.Button btnClose;
@@ -33,6 +34,7 @@ namespace LotusLMSClient.Forms
             this.btnProfile = new System.Windows.Forms.Button();
             this.btnQnA = new System.Windows.Forms.Button();
             this.btnExams = new System.Windows.Forms.Button();
+            this.btnLogs = new System.Windows.Forms.Button();
             this.btnCourses = new System.Windows.Forms.Button();
             this.btnDashboard = new System.Windows.Forms.Button();
             this.panelLogo = new System.Windows.Forms.Panel();
@@ -50,6 +52,7 @@ namespace LotusLMSClient.Forms
             // 
             this.panelSidebar.Controls.Add(this.btnLogout);
             this.panelSidebar.Controls.Add(this.btnProfile);
+            this.panelSidebar.Controls.Add(this.btnLogs);
             this.panelSidebar.Controls.Add(this.btnQnA);
             this.panelSidebar.Controls.Add(this.btnExams);
             this.panelSidebar.Controls.Add(this.btnCourses);
@@ -72,10 +75,20 @@ namespace LotusLMSClient.Forms
             this.btnLogout.UseVisualStyleBackColor = true;
             this.btnLogout.Click += new System.EventHandler(this.btnLogout_Click);
             // 
+            // btnLogs
+            // 
+            this.btnLogs.Dock = System.Windows.Forms.DockStyle.Top;
+            this.btnLogs.Location = new System.Drawing.Point(0, 260);
+            this.btnLogs.Name = "btnLogs";
+            this.btnLogs.Size = new System.Drawing.Size(220, 50);
+            this.btnLogs.TabIndex = 7;
+            this.btnLogs.Text = "📜 Nhật ký";
+            this.btnLogs.UseVisualStyleBackColor = true;
+            // 
             // btnProfile
             // 
             this.btnProfile.Dock = System.Windows.Forms.DockStyle.Top;
-            this.btnProfile.Location = new System.Drawing.Point(0, 260);
+            this.btnProfile.Location = new System.Drawing.Point(0, 310);
             this.btnProfile.Name = "btnProfile";
             this.btnProfile.Size = new System.Drawing.Size(220, 50);
             this.btnProfile.TabIndex = 5;

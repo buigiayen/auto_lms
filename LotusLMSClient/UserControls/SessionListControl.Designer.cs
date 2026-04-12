@@ -11,6 +11,7 @@ namespace LotusLMSClient.UserControls
         private System.Windows.Forms.DataGridViewTextBoxColumn ColRoom;
         private System.Windows.Forms.DataGridViewTextBoxColumn ColSubject;
         private System.Windows.Forms.DataGridViewTextBoxColumn ColTeacher;
+        private System.Windows.Forms.DataGridViewButtonColumn ColLog;
 
         protected override void Dispose(bool disposing)
         {
@@ -31,6 +32,7 @@ namespace LotusLMSClient.UserControls
             this.ColRoom = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.ColSubject = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.ColTeacher = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.ColLog = new System.Windows.Forms.DataGridViewButtonColumn();
             ((System.ComponentModel.ISupportInitialize)(this.dgvSessions)).BeginInit();
             this.SuspendLayout();
 
@@ -43,7 +45,8 @@ namespace LotusLMSClient.UserControls
             this.dgvSessions.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.dgvSessions.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
             this.ColDate,
-            this.ColSubject});
+            this.ColSubject,
+            this.ColLog});
             this.dgvSessions.Location = new System.Drawing.Point(26, 30);
             this.dgvSessions.Name = "dgvSessions";
             this.dgvSessions.ReadOnly = true;
@@ -62,6 +65,13 @@ namespace LotusLMSClient.UserControls
             this.ColSubject.HeaderText = "Thời gian học";
             this.ColSubject.Name = "ColSubject";
             this.ColSubject.ReadOnly = true;
+            // 
+            // ColLog
+            // 
+            this.ColLog.HeaderText = "Log";
+            this.ColLog.Name = "ColLog";
+            this.ColLog.ReadOnly = true;
+            this.ColLog.Width = 50;
             // SessionListControl
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);

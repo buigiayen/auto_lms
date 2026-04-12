@@ -10,10 +10,10 @@ namespace LotusLMSClient.UserControls
             {
                 components.Dispose();
             }
-            if (disposing && _autoStudyTimer != null)
+            if (disposing && _countdownTickTimer != null)
             {
-                _autoStudyTimer.Stop();
-                _autoStudyTimer.Dispose();
+                _countdownTickTimer.Stop();
+                _countdownTickTimer.Dispose();
             }
             base.Dispose(disposing);
         }

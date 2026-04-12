@@ -44,6 +44,7 @@ namespace LotusLMSClient.Forms
             FormatNavButton(btnCourses);
             FormatNavButton(btnExams);
             FormatNavButton(btnQnA);
+            FormatNavButton(btnLogs);
             FormatNavButton(btnProfile);
             FormatNavButton(btnLogout);
             
@@ -51,6 +52,7 @@ namespace LotusLMSClient.Forms
             btnProfile.Click += btnProfile_Click;
             btnExams.Click += btnExams_Click;
             btnQnA.Click += btnQnA_Click;
+            btnLogs.Click += btnLogs_Click;
             
             // Default active
             btnDashboard.PerformClick();
@@ -97,6 +99,10 @@ namespace LotusLMSClient.Forms
 
         private void LoadUserControl(UserControl uc)
         {
+            foreach (Control ctrl in panelContent.Controls)
+            {
+                ctrl.Dispose();
+            }
             panelContent.Controls.Clear();
             uc.Dock = DockStyle.Fill;
             panelContent.Controls.Add(uc);
@@ -140,6 +146,12 @@ namespace LotusLMSClient.Forms
         {
             ActivateButton(sender);
             LoadUserControl(new ProfileControl(_authService.CurrentName, _authService.CurrentCccd));
+        }
+
+        private void btnLogs_Click(object sender, EventArgs e)
+        {
+            ActivateButton(sender);
+            LoadUserControl(new LogControl());
         }
 
         private void btnExams_Click(object sender, EventArgs e)

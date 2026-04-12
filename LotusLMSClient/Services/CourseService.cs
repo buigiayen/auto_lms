@@ -11,6 +11,9 @@ namespace LotusLMSClient.Services
     {
         private readonly ApiService _apiService;
         private readonly AuthService _authService;
+        
+        public AuthService AuthService => _authService;
+
         private int _enrolmentPlanIid = 000000000;
         private const string StudentCoursesRi = "90e6affb162954a72ccb4917ad194919";
         private const string StudentCoursesRit = "3be8e77646c3da451a159ac537ce04df:ke7zTTwkVJf0SJeMDMEthbD60HcOUUTZRGZPN0bw2v4R0FhoeTvoh8rw5rvaYERv";

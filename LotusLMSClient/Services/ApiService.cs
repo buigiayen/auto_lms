@@ -10,8 +10,8 @@ namespace LotusLMSClient.Services
     {
         private readonly HttpClient _client;
         private const string BASE_URL = "https://staging-api.lotuslms.com";
-        public const string WEB_ORIGIN = "https://truongson.huelms.com";
-        public const string WEB_LOGIN_URL = WEB_ORIGIN + "/user/login?b=BLddg3cXu25CkuF7rOxu+n/sDKtXz5WrSYkcqndM47c=";
+        public const string WEB_ORIGIN = "https://toandien.huelms.com";
+        public const string WEB_LOGIN_URL = WEB_ORIGIN + "/user/login/?logout=1";
 
         public ApiService()
         {
@@ -29,7 +29,6 @@ namespace LotusLMSClient.Services
             _client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36");
             _client.DefaultRequestHeaders.TryAddWithoutValidation("Origin", WEB_ORIGIN);
             _client.DefaultRequestHeaders.TryAddWithoutValidation("Referer", WEB_LOGIN_URL);
-            _client.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", "name=value");
         }
 
         public void SetAuthToken(string token)

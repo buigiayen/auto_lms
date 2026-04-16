@@ -15,7 +15,7 @@ namespace LotusLMSClient.UserControls
         private readonly CourseService _courseService;
         private List<Course> _courses;
         public Action<Course> OnCourseSelected { get; set; }
-        public Action<Course, SubjectDetails> OnCourseDetailLoaded { get; set; }
+        public Action<Course, RubricResult> OnCourseRubricLoaded { get; set; }
 
         public CourseListControl(AuthService authService)
         {
@@ -110,12 +110,12 @@ namespace LotusLMSClient.UserControls
                 btnAction.Text = "Đang tải...";
                 try
                 {
-                    var jData = await _courseService.GetDetailLearningTimeAsync(course.Iid);
-                    OnCourseDetailLoaded?.Invoke(course, jData);
+                    var detail = await _courseService.GetExamCourseDetailAsync(course.Iid);
+                    OnCourseRubricLoaded?.Invoke(course, detail);
                 }
                 catch
                 {
-                    OnCourseDetailLoaded?.Invoke(course, null);
+                    OnCourseRubricLoaded?.Invoke(course, null);
                 }
                 finally
                 {

@@ -16,8 +16,8 @@ namespace LotusLMSClient.Services
         public int CurrentUserIid { get; private set; }
         public string CurrentUserId { get; private set; }
 
-        public const string SandDeviceUuid = "acd42ed7-b678-4704-b07c-7128b06e4f16";
-        public const string SandSessionId = "2c710456-c150-42e1-85a6-f6e7ccbe7383";
+        public const string SandDeviceUuid = "6587f9f2-7a8b-43f8-9c95-e94b7ae90382";
+        public const string SandSessionId = "b0cd321a-7370-46af-b095-afa0e0340a6a";
         public const string SandUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36";
 
         public ApiService ApiService => _apiService;
@@ -40,7 +40,7 @@ namespace LotusLMSClient.Services
                 { "_sand_is_wan", "false" },
                 { "_sand_ga_sessionToken", string.Empty },
                 { "_sand_ga_browserToken", string.Empty },
-                { "_sand_domain", "truongson" },
+                { "_sand_domain", "toandien" },
                 { "_sand_masked", string.Empty },
                 { "_sand_web_url", ApiService.WEB_LOGIN_URL },
                 { "_sand_device_uuid", SandDeviceUuid },
@@ -48,8 +48,8 @@ namespace LotusLMSClient.Services
                 { "_sand_use_internal_network", "0" },
                 { "allow_cache_api_cdn", "1" },
                 { "_sand_user_agent", SandUserAgent },
-                { "_sand_ri", "11f85ebe6b47c10449b6b7a63f62455c" },
-                { "_sand_rit", "b93346eb488df0b749311e41637b5b94:qY5ll1uFeXNTM8+JGoyDGtutkEy9btf510RkFCzDnrJexiCQiKXo9THpuGntLFRD" }
+                { "_sand_ri", "8cbcfef31fd3b4c730a90124640619ad" },
+                { "_sand_rit", "ddfd1e7d986bb7743a479117dc72a574:1ebBJRNcQOy0/fovqo+ofL9ulu1gaNqOhkaK+L9TCUoVtMWHmFxib42uF9K1ymlb" }
             };
 
             try

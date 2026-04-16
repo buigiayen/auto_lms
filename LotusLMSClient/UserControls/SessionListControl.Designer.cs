@@ -11,7 +11,7 @@ namespace LotusLMSClient.UserControls
         private System.Windows.Forms.DataGridViewTextBoxColumn ColRoom;
         private System.Windows.Forms.DataGridViewTextBoxColumn ColSubject;
         private System.Windows.Forms.DataGridViewTextBoxColumn ColTeacher;
-        private System.Windows.Forms.DataGridViewTextBoxColumn ColStatus;
+        private System.Windows.Forms.DataGridViewButtonColumn ColLog;
 
         protected override void Dispose(bool disposing)
         {
@@ -32,36 +32,10 @@ namespace LotusLMSClient.UserControls
             this.ColRoom = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.ColSubject = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.ColTeacher = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.ColStatus = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.ColLog = new System.Windows.Forms.DataGridViewButtonColumn();
             ((System.ComponentModel.ISupportInitialize)(this.dgvSessions)).BeginInit();
             this.SuspendLayout();
-            // 
-            // lblTitle
-            // 
-            this.lblTitle.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.lblTitle.AutoSize = true;
-            this.lblTitle.Font = new System.Drawing.Font("Segoe UI", 20F, System.Drawing.FontStyle.Bold);
-            this.lblTitle.Location = new System.Drawing.Point(25, 20);
-            this.lblTitle.Name = "lblTitle";
-            this.lblTitle.Size = new System.Drawing.Size(201, 37);
-            this.lblTitle.TabIndex = 0;
-            this.lblTitle.Text = "📅 Lịch học tập";
-            // 
-            // lblSubtitle
-            // 
-            this.lblSubtitle.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.lblSubtitle.AutoSize = true;
-            this.lblSubtitle.Font = new System.Drawing.Font("Segoe UI", 11F);
-            this.lblSubtitle.Location = new System.Drawing.Point(27, 70);
-            this.lblSubtitle.Name = "lblSubtitle";
-            this.lblSubtitle.Size = new System.Drawing.Size(409, 20);
-            this.lblSubtitle.TabIndex = 1;
-            this.lblSubtitle.Text = "Theo dõi các buổi học tập trung Offline và Online tại đây.";
-            // 
-            // dgvSessions
-            // 
+
             this.dgvSessions.AllowUserToAddRows = false;
             this.dgvSessions.AllowUserToDeleteRows = false;
             this.dgvSessions.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
@@ -71,54 +45,33 @@ namespace LotusLMSClient.UserControls
             this.dgvSessions.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             this.dgvSessions.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
             this.ColDate,
-            this.ColTime,
-            this.ColRoom,
             this.ColSubject,
-            this.ColTeacher,
-            this.ColStatus});
-            this.dgvSessions.Location = new System.Drawing.Point(26, 110);
+            this.ColLog});
+            this.dgvSessions.Location = new System.Drawing.Point(26, 30);
             this.dgvSessions.Name = "dgvSessions";
             this.dgvSessions.ReadOnly = true;
             this.dgvSessions.RowHeadersVisible = false;
-            this.dgvSessions.Size = new System.Drawing.Size(748, 560);
+            this.dgvSessions.Size = new System.Drawing.Size(755, 640);
             this.dgvSessions.TabIndex = 2;
             // 
             // ColDate
             // 
-            this.ColDate.HeaderText = "Ngày học";
+            this.ColDate.HeaderText = "Tên bài học";
             this.ColDate.Name = "ColDate";
             this.ColDate.ReadOnly = true;
             // 
-            // ColTime
-            // 
-            this.ColTime.HeaderText = "Thời gian";
-            this.ColTime.Name = "ColTime";
-            this.ColTime.ReadOnly = true;
-            // 
-            // ColRoom
-            // 
-            this.ColRoom.HeaderText = "Phòng/Địa điểm";
-            this.ColRoom.Name = "ColRoom";
-            this.ColRoom.ReadOnly = true;
-            // 
             // ColSubject
             // 
-            this.ColSubject.HeaderText = "Nội dung học";
+            this.ColSubject.HeaderText = "Thời gian học";
             this.ColSubject.Name = "ColSubject";
             this.ColSubject.ReadOnly = true;
             // 
-            // ColTeacher
+            // ColLog
             // 
-            this.ColTeacher.HeaderText = "Giảng viên";
-            this.ColTeacher.Name = "ColTeacher";
-            this.ColTeacher.ReadOnly = true;
-            // 
-            // ColStatus
-            // 
-            this.ColStatus.HeaderText = "Trạng thái";
-            this.ColStatus.Name = "ColStatus";
-            this.ColStatus.ReadOnly = true;
-            // 
+            this.ColLog.HeaderText = "Log";
+            this.ColLog.Name = "ColLog";
+            this.ColLog.ReadOnly = true;
+            this.ColLog.Width = 50;
             // SessionListControl
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);

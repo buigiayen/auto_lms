@@ -44,6 +44,7 @@ namespace LotusLMSClient.Forms
             FormatNavButton(btnCourses);
             FormatNavButton(btnExams);
             FormatNavButton(btnQnA);
+            FormatNavButton(btnLogs);
             FormatNavButton(btnProfile);
             FormatNavButton(btnLogout);
             
@@ -51,6 +52,7 @@ namespace LotusLMSClient.Forms
             btnProfile.Click += btnProfile_Click;
             btnExams.Click += btnExams_Click;
             btnQnA.Click += btnQnA_Click;
+            btnLogs.Click += btnLogs_Click;
             
             // Default active
             btnDashboard.PerformClick();
@@ -97,6 +99,10 @@ namespace LotusLMSClient.Forms
 
         private void LoadUserControl(UserControl uc)
         {
+            foreach (Control ctrl in panelContent.Controls)
+            {
+                ctrl.Dispose();
+            }
             panelContent.Controls.Clear();
             uc.Dock = DockStyle.Fill;
             panelContent.Controls.Add(uc);
@@ -111,7 +117,29 @@ namespace LotusLMSClient.Forms
         private void btnCourses_Click(object sender, EventArgs e)
         {
             ActivateButton(sender);
-            LoadUserControl(new CourseListControl(_authService));
+            LoadCourseList();
+        }
+
+        private void LoadCourseList()
+        {
+            var courseList = new CourseListControl(_authService);
+
+            // Khi API get-detail-learning-time trả về → hiển thị phân cấp
+            courseList.OnCourseDetailLoaded = (course, jData) =>
+            {
+                var detail = new CourseDetailControl(course, jData, new CourseService(new ApiService(), _authService));
+                // Nút Quay lại → quay về danh sách khóa học
+                detail.OnBack = () => LoadCourseList();
+                LoadUserControl(detail);
+            };
+
+            // Giữ lại fallback cũ nếu cần
+            courseList.OnCourseSelected = (course) =>
+            {
+                LoadUserControl(new SessionListControl());
+            };
+
+            LoadUserControl(courseList);
         }
         
         private void btnProfile_Click(object sender, EventArgs e)
@@ -120,11 +148,15 @@ namespace LotusLMSClient.Forms
             LoadUserControl(new ProfileControl(_authService.CurrentName, _authService.CurrentCccd));
         }
 
+        private void btnLogs_Click(object sender, EventArgs e)
+        {
+            ActivateButton(sender);
+            LoadUserControl(new LogControl());
+        }
+
         private void btnExams_Click(object sender, EventArgs e)
         {
             ActivateButton(sender);
-            LoadUserControl(new SessionListControl()); // Reusing it as a placeholder or could show an under construction message
-            // MessageBox.Show("Tính năng Đang phát triển");
         }
 
         private void btnQnA_Click(object sender, EventArgs e)

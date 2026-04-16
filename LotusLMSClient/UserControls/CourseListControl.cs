@@ -5,6 +5,8 @@ using LotusLMSClient.Helpers;
 using LotusLMSClient.Services;
 using LotusLMSClient.Models;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 
 namespace LotusLMSClient.UserControls
 {
@@ -12,6 +14,8 @@ namespace LotusLMSClient.UserControls
     {
         private readonly CourseService _courseService;
         private List<Course> _courses;
+        public Action<Course> OnCourseSelected { get; set; }
+        public Action<Course, SubjectDetails> OnCourseDetailLoaded { get; set; }
 
         public CourseListControl(AuthService authService)
         {
@@ -101,7 +105,24 @@ namespace LotusLMSClient.UserControls
                 Height = 30
             };
             btnAction.FlatAppearance.BorderSize = 0;
-            btnAction.Click += (s, e) => MessageBox.Show($"Mở khóa học: {course.Name}");
+            btnAction.Click += async (s, e) => {
+                btnAction.Enabled = false;
+                btnAction.Text = "Đang tải...";
+                try
+                {
+                    var jData = await _courseService.GetDetailLearningTimeAsync(course.Iid);
+                    OnCourseDetailLoaded?.Invoke(course, jData);
+                }
+                catch
+                {
+                    OnCourseDetailLoaded?.Invoke(course, null);
+                }
+                finally
+                {
+                    btnAction.Enabled = true;
+                    btnAction.Text = course.Status == "Completed" ? "Xem lại" : "Tiếp tục học ngày hôm nay";
+                }
+            };
 
             card.Controls.Add(btnAction);
             card.Controls.Add(progress);

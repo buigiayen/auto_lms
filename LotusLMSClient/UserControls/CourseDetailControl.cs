@@ -17,6 +17,7 @@ namespace LotusLMSClient.UserControls
         private Panel _headerPanel;
         private Button _btnBack;
         private Label _lblCourseName;
+        private Label _lblKpiInfo;
         private Panel _contentPanel;
         private Label _lblStatus;
         private Panel _nextSaveStrip;
@@ -29,7 +30,7 @@ namespace LotusLMSClient.UserControls
         private bool _saveCycleRunning;
         private bool _autoStudyStoppedPermanently;
         private const int SaveIntervalSeconds = 15;
-        private int _currentIntervalSeconds = SaveIntervalSeconds; // Interval thực tế cho chu kỳ hiện tại
+        private int _currentIntervalSeconds = SaveIntervalSeconds;
         private int _saveCallCount = 0;
         private dynamic _manualStudyItem = null;
 
@@ -62,7 +63,7 @@ namespace LotusLMSClient.UserControls
             _headerPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 80, // Increased height for multiple lines
+                Height = 80,
                 BackColor = ColorPalette.Primary,
                 Padding = new Padding(12, 10, 12, 10)
             };
@@ -70,9 +71,9 @@ namespace LotusLMSClient.UserControls
             Panel btnContainer = new Panel
             {
                 Dock = DockStyle.Left,
-                Width = 95, // Smaller width
+                Width = 85,
                 BackColor = Color.Transparent,
-                Padding = new Padding(0, 10, 0, 10) // Center button vertically
+                Padding = new Padding(0, 15, 0, 15)
             };
 
             _btnBack = new Button
@@ -81,7 +82,7 @@ namespace LotusLMSClient.UserControls
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = Color.White,
                 BackColor = Color.Transparent,
-                Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
                 Dock = DockStyle.Fill,
                 Cursor = Cursors.Hand
             };
@@ -100,11 +101,53 @@ namespace LotusLMSClient.UserControls
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Padding = new Padding(15, 0, 0, 0),
-                AutoEllipsis = false // Turn off ellipsis to allow wrapping
+                AutoEllipsis = false
+            };
+
+            _lblKpiInfo = new Label
+            {
+                Text = "⏱ Thời gian đã học hôm nay: Đang tải...",
+                ForeColor = Color.FromArgb(230, 230, 230),
+                Font = new Font("Segoe UI", 8.25F, FontStyle.Regular),
+                Dock = DockStyle.Bottom,
+                Height = 22,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(15, 0, 0, 0)
             };
 
             _headerPanel.Controls.Add(_lblCourseName);
+            _headerPanel.Controls.Add(_lblKpiInfo);
             _headerPanel.Controls.Add(btnContainer);
+
+            LoadInitialKpiAsync();
+        }
+
+        private async void LoadInitialKpiAsync()
+        {
+            var data = await _courseService.CheckTodayKpiTimeAsync(_course.Iid);
+            UpdateKpiDisplay(data);
+        }
+
+        private void UpdateKpiDisplay(KpiData data)
+        {
+            if (this.IsDisposed || _lblKpiInfo == null) return;
+            
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(() => UpdateKpiDisplay(data)));
+                return;
+            }
+
+            _lblKpiInfo.Text = $"⏱ Thời gian đã học hôm nay: {data.FormattedProgress}";
+            if (data.IsReached)
+            {
+                _lblKpiInfo.ForeColor = Color.FromArgb(100, 255, 100);
+                _lblKpiInfo.Text += " ✅ Đã đủ KPI";
+            }
+            else
+            {
+                _lblKpiInfo.ForeColor = Color.FromArgb(220, 220, 220);
+            }
         }
 
         private void BuildContent()
@@ -243,10 +286,6 @@ namespace LotusLMSClient.UserControls
             }
         }
 
-        /// <summary>
-        /// Tính interval thực tế: nếu item tiếp theo còn lại ít hơn SaveIntervalSeconds
-        /// thì đếm ngược đúng bằng thời gian đó thay vì luôn là 15s.
-        /// </summary>
         private int ComputeNextIntervalSeconds()
         {
             if (_rawData?.result?.children == null) return SaveIntervalSeconds;
@@ -414,9 +453,22 @@ namespace LotusLMSClient.UserControls
 
                 if (_saveCallCount == 3)
                 {
+                    // Check KPI trước khi gọi track time hoặc định kỳ
+                    KpiData kpiData = await _courseService.CheckTodayKpiTimeAsync(_course.Iid);
+                    UpdateKpiDisplay(kpiData);
+
+                    if (kpiData.IsReached && !this.IsDisposed)
+                    {
+                        StopAutoStudy();
+                        MessageBox.Show("Đã đạt KPI học tập trong ngày! Tự động dừng để đảm bảo an toàn.", "Lotus LMS", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        int userIid = _courseService.AuthService?.CurrentUserIid ?? 0;
+                        AppLog.Info($"Dừng tự động học: Đã đạt KPI hàng ngày cho khóa học [{_course.Name}]", 0, userIid);
+                        return;
+                    }
+
                     await _courseService.TrackTimeAsync(_course.Iid, 15.0);
-                    int userIid = _courseService.AuthService?.CurrentUserIid ?? 0;
-                    AppLog.Info($"Đã gọi Track-Time (15s) cho khóa học [{_course.Name}]", 0, userIid);
+                    int userIidTrack = _courseService.AuthService?.CurrentUserIid ?? 0;
+                    AppLog.Info($"Đã gọi Track-Time (15s) cho khóa học [{_course.Name}]", 0, userIidTrack);
                     _saveCallCount = 0;
                 }
             }
@@ -425,7 +477,6 @@ namespace LotusLMSClient.UserControls
                 _saveCycleRunning = false;
                 if (!stopForever && _countdownTickTimer != null && _countdownTickTimer.Enabled)
                 {
-                    // Tính lại interval cho chu kỳ tiếp theo (item có thể đã hoàn thành, chuyển sang item mới)
                     _currentIntervalSeconds = ComputeNextIntervalSeconds();
                     _secondsUntilNextSave = _currentIntervalSeconds;
                 }
@@ -449,11 +500,6 @@ namespace LotusLMSClient.UserControls
                 return false;
             }
         }
-
-        /// <summary>
-        /// Tìm bài chưa đủ min: ưu tiên con (lá) trước cha.
-        /// Tránh chọn nhóm 3.10 khi Phần 1/2 còn thiếu — gửi time vào cha thường không làm nhảy phần con trên UI / server.
-        /// </summary>
         private dynamic FindNextUncompletedItem(dynamic children)
         {
             if (children == null) return null;

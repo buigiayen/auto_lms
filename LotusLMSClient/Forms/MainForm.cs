@@ -124,10 +124,10 @@ namespace LotusLMSClient.Forms
         {
             var courseList = new CourseListControl(_authService);
 
-            // Khi API get-detail-learning-time trả về → hiển thị phân cấp
-            courseList.OnCourseDetailLoaded = (course, jData) =>
+            // Khi lấy dữ liệu chi tiết của một Course, hiển thị giao diện Rubric như Bài thi
+            courseList.OnCourseRubricLoaded = (course, rubricData) =>
             {
-                var detail = new CourseDetailControl(course, jData, new CourseService(new ApiService(), _authService));
+                var detail = new ExamDetailControl(course, rubricData, new CourseService(new ApiService(), _authService));
                 // Nút Quay lại → quay về danh sách khóa học
                 detail.OnBack = () => LoadCourseList();
                 LoadUserControl(detail);
@@ -157,6 +157,21 @@ namespace LotusLMSClient.Forms
         private void btnExams_Click(object sender, EventArgs e)
         {
             ActivateButton(sender);
+            LoadExamList();
+        }
+
+        private void LoadExamList()
+        {
+            var examList = new ExamListControl(_authService);
+            
+            examList.OnExamDetailLoaded = (course, result) =>
+            {
+                var detail = new ExamDetailControl(course, result, new CourseService(new ApiService(), _authService));
+                detail.OnBack = () => LoadExamList();
+                LoadUserControl(detail);
+            };
+
+            LoadUserControl(examList);
         }
 
         private void btnQnA_Click(object sender, EventArgs e)

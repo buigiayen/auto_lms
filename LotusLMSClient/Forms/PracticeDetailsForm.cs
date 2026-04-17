@@ -75,7 +75,15 @@ namespace LotusLMSClient.Forms
                 flowSubjects.Controls.Add(new Label { Text = "Không thể lấy dữ liệu (API trả về null hoặc lỗi mạng).", ForeColor = Color.Red, AutoSize = true, Font = new Font("Segoe UI", 10F) });
                 return;
             }
-            
+
+            var examTemplateIid = json.SelectToken("result._expand.exam_sco.template_details[0].exercise_template[0].exam_template_iid")?.Value<int?>();
+            var bankIid = json.SelectToken("result._expand.exam_sco.question_banks[0]")?.Value<int?>();
+
+            if (examTemplateIid.HasValue && bankIid.HasValue)
+            {
+                await _courseService.GetQuestionBankStatusAsync(examTemplateIid.Value, bankIid.Value, _course.Iid);
+            }
+
             BuildMockUiForTesting(json);
         }
 

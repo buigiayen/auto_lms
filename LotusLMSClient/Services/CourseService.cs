@@ -543,7 +543,7 @@ namespace LotusLMSClient.Services
             string sessionId = AuthService.SandSessionId;
             
             var endpoint = $"/practice/api/get-question-bank-status?" +
-                           $"bank_iids%5B%5D={bankIid}&" +
+                           $"bank_iids[]={bankIid}&" +
                            $"exam_template_iid={examTemplateIid}&" +
                            $"last_ts=0&submit=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&" +
                            $"_sand_ga_sessionToken=&_sand_ga_browserToken=&" +

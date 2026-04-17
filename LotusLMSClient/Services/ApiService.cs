@@ -75,5 +75,32 @@ namespace LotusLMSClient.Services
                 throw new ApplicationException($"Lỗi kết nối tới server: {ex.Message}", ex);
             }
         }
+
+        public async Task<T> GetAsync<T>(string endpoint, Dictionary<string, string> requestHeaders = null)
+        {
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+
+                if (requestHeaders != null)
+                {
+                    foreach (var header in requestHeaders)
+                    {
+                        request.Headers.Remove(header.Key);
+                        request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                    }
+                }
+
+                var response = await _client.SendAsync(request);
+                response.EnsureSuccessStatusCode();
+
+                var jsonString = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<T>(jsonString);
+            }
+            catch (Exception ex)
+            {
+                throw new ApplicationException($"Lỗi kết nối tới server: {ex.Message}", ex);
+            }
+        }
     }
 }

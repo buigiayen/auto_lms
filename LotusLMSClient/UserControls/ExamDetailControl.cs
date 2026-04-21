@@ -6,6 +6,7 @@ using LotusLMSClient.Helpers;
 using LotusLMSClient.Forms;
 using System.Collections.Generic;
 using LotusLMSClient.Services;
+using Newtonsoft.Json.Linq;
 
 namespace LotusLMSClient.UserControls
 {
@@ -14,8 +15,9 @@ namespace LotusLMSClient.UserControls
         private readonly Course _course;
         private readonly RubricResult _result;
         private readonly CourseService _courseService;
-        private SubjectDetails? _cachedDetails;
+        private SubjectDetails _cachedDetails;
         public Action OnBack { get; set; }
+        public Action<Course, SubjectDetails, bool> OnRequestCourseView { get; set; }
 
         public ExamDetailControl(Course course, RubricResult result, CourseService courseService)
         {
@@ -118,11 +120,34 @@ namespace LotusLMSClient.UserControls
             progressTime.Value = (int)Math.Min(100, cp);
             lblPercent.Text = $"{cp:F1}%";
 
-            double score = expanded?.Score ?? _result.P ?? _result.Score ?? 0;
+            var items = expanded?.Items;
             
-            // DYNAMIC SCORES
-            double maxScore = expanded?.Items?.Find(i => i.Name != null && i.Name.Contains("Tiến độ môn học"))?.MaxScore ?? 0;
-            if (maxScore == 0) maxScore = _result.Rubric?.MaxScore ?? 25;
+            // DYNAMIC SCORES CALCULATION
+            double score = 0;
+            double maxScore = 0;
+
+            if (items != null && items.Count > 0)
+            {
+                foreach (var item in items)
+                {
+                    if (item.Name == null) continue;
+                    if (item.Name.Contains("[2025]")) continue;
+
+                    // Chỉ cộng từ các danh mục tiến độ chính đã yêu cầu
+                    if (item.Name.Contains("Xem giáo trình") || 
+                        item.Name.Contains("Ôn luyện") || 
+                        item.Name.Contains("Kiểm tra"))
+                    {
+                        // Kiểm tra nếu nó không phải là nút cha (nếu có cách xác định) 
+                        // Hoặc tin tưởng vào các text cụ thể này thường là leaf/metric chính
+                        score += item.Score ?? 0;
+                        maxScore += item.MaxScore ?? 0;
+                    }
+                }
+            }
+
+            if (maxScore == 0) maxScore = _result.Rubric?.MaxScore ?? 0;
+            if (score == 0) score = expanded?.Score ?? _result.P ?? _result.Score ?? 0;
             
             double passScore = _result.Rubric?.PassScore ?? (maxScore * 0.7);
 
@@ -136,7 +161,7 @@ namespace LotusLMSClient.UserControls
             // Center the flow layout manually
             if (this.Width > 0) flpSummary.Left = (this.Width - flpSummary.Width) / 2;
             dgvScores.Rows.Clear();
-            var items = expanded?.Items;
+            // Items already defined above
             if (items != null)
             {
                 foreach (var item in items)
@@ -220,31 +245,7 @@ namespace LotusLMSClient.UserControls
                         return;
                     }
 
-                    int pIid = 0;
-                    try
-                    {
-                        string jsonStr = Newtonsoft.Json.JsonConvert.SerializeObject(_cachedDetails);
-                        var rootObj = Newtonsoft.Json.Linq.JObject.Parse(jsonStr);
-                        var practiceTokens = rootObj.SelectTokens("$..[?(@.ntype == 'practice')]");
-                        foreach (var token in practiceTokens)
-                        {
-                            if (token["iid"] != null)
-                            {
-                                pIid = (int)token["iid"];
-                                break;
-                            }
-                        }
-                    }
-                    catch { }
-
-                    if (pIid == 0)
-                    {
-                        MessageBox.Show("Không tìm thấy ID thực hành của khóa học này.", "Lỗi");
-                        return;
-                    }
-
-                    using var practiceForm = new PracticeDetailsForm(_course, pIid, _courseService);
-                    practiceForm.ShowDialog(this);
+                    OnRequestCourseView?.Invoke(_course, _cachedDetails, true);
                     return;
                 }
 
@@ -261,9 +262,7 @@ namespace LotusLMSClient.UserControls
                     return;
                 }
 
-                // Mở popup với CourseDetailControl bên trong — có đầy đủ chức năng tự học
-                using var detailsForm = new LessonDetailsForm(_course, _cachedDetails, _courseService);
-                detailsForm.ShowDialog(this);
+                OnRequestCourseView?.Invoke(_course, _cachedDetails, false);
             }
             catch (Exception ex)
             {

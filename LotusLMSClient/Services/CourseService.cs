@@ -280,11 +280,33 @@ namespace LotusLMSClient.Services
                     
                     if (required <= 0)
                     {
-                        if (result["required_time"] != null) double.TryParse(result["required_time"].ToString(), out required);
-                        else if (result["total_kpi_time"] != null) double.TryParse(result["total_kpi_time"].ToString(), out required);
-                        else if (result["kpi_time"] != null) double.TryParse(result["kpi_time"].ToString(), out required);
-                        else if (result["limit_time"] != null) double.TryParse(result["limit_time"].ToString(), out required);
-                        else if (result["standard_time"] != null) double.TryParse(result["standard_time"].ToString(), out required);
+                        // Exhaustive search in result object
+                        string[] possibleFields = { 
+                            "required_time", "total_kpi_time", "kpi_time", "limit_time", 
+                            "standard_time", "max_learning_time", "config_kpi_time", "target_time" 
+                        };
+                        
+                        foreach (var field in possibleFields)
+                        {
+                            if (result[field] != null && double.TryParse(result[field].ToString(), out double val) && val > 0)
+                            {
+                                required = val;
+                                break;
+                            }
+                        }
+
+                        // Also check inside 'kpi' nested object if it exists
+                        if (required <= 0 && result["kpi"] != null)
+                        {
+                            foreach (var field in possibleFields)
+                            {
+                                if (result["kpi"][field] != null && double.TryParse(result["kpi"][field].ToString(), out double val) && val > 0)
+                                {
+                                    required = val;
+                                    break;
+                                }
+                            }
+                        }
                     }
 
                     data.GainedTime = gained;
@@ -322,13 +344,9 @@ namespace LotusLMSClient.Services
                         else
                             data.FormattedProgress = $"{gainedHours:F2}/{requiredHours:F1} giờ";
                     }
-                    else if (data.Percent > 0)
-                    {
-                        data.FormattedProgress = $"{data.Percent:F1}% (Chưa rõ giới hạn)";
-                    }
                     else
                     {
-                        data.FormattedProgress = "0/12 giờ (Đang cập nhật)";
+                        data.FormattedProgress = $"{(gained / 3600.0):F2}/? giờ";
                     }
                 }
 
@@ -534,7 +552,7 @@ namespace LotusLMSClient.Services
             }
         }
         
-        public async Task<JObject> GetQuestionBankStatusAsync(int examTemplateIid, int bankIid, int courseIid)
+        public async Task<JObject> GetQuestionBankStatusAsync(int examScoIid, int bankIid, int courseIid)
         {
             if (_authService == null || !_authService.IsAuthenticated) return null;
 
@@ -544,7 +562,7 @@ namespace LotusLMSClient.Services
             
             var endpoint = $"/practice/api/get-question-bank-status?" +
                            $"bank_iids[]={bankIid}&" +
-                           $"exam_template_iid={examTemplateIid}&" +
+                           $"exam_template_iid={examScoIid}&" +
                            $"last_ts=0&submit=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&" +
                            $"_sand_ga_sessionToken=&_sand_ga_browserToken=&" +
                            $"_sand_domain=truongson&_sand_masked=&" +
@@ -568,6 +586,135 @@ namespace LotusLMSClient.Services
             catch (Exception ex)
             {
                 AppLog.Error($"Lỗi lấy trạng thái ngân hàng câu hỏi (GET): {ex.Message}", 0, _authService.CurrentUserIid);
+                return null;
+            }
+        }
+
+        public async Task<JObject> GetSyncPracticeProgressAsync(int practiceIid, int examScoIid, int courseIid, string ri = null, string rit = null)
+        {
+            if (_authService == null || !_authService.IsAuthenticated) return null;
+
+            var endpoint = "/practice/api/get-sync-practice-progress";
+            var requestUrl = $"{ApiService.WEB_ORIGIN}/learn/course/learn/{courseIid}";
+
+            var formData = new Dictionary<string, string>
+            {
+                { "practice_iid", practiceIid.ToString() },
+                { "exam_sco_iid", examScoIid.ToString() },
+                { "submit", "1" },
+                { "_sand_ajax", "1" },
+                { "_sand_platform", "3" },
+                { "_sand_readmin", "1" },
+                { "_sand_is_wan", "false" },
+                { "_sand_ga_sessionToken", "" },
+                { "_sand_ga_browserToken", "" },
+                { "_sand_domain", "truongson" },
+                { "_sand_masked", "" },
+                { "_sand_web_url", requestUrl },
+                { "_sand_device_uuid", AuthService.SandDeviceUuid },
+                { "_sand_session_id", AuthService.SandSessionId },
+                { "_sand_use_internal_network", "0" },
+                { "allow_cache_api_cdn", "1" },
+                { "_sand_token", _authService.CurrentToken },
+                { "_sand_uiid", _authService.CurrentUserIid.ToString() },
+                { "_sand_uid", _authService.CurrentUserId },
+                { "_sand_user_agent", AuthService.SandUserAgent },
+                { "_sand_ri", string.IsNullOrEmpty(ri) ? StudentCoursesRi : ri },
+                { "_sand_rit", string.IsNullOrEmpty(rit) ? StudentCoursesRit : rit }
+            };
+
+            var headers = new Dictionary<string, string>
+            {
+                { "Referer", requestUrl },
+                { "Origin", ApiService.WEB_ORIGIN },
+                { "User-Agent", AuthService.SandUserAgent }
+            };
+
+            try
+            {
+                return await _apiService.PostFormDataAsync<JObject>(endpoint, formData, headers);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error($"Lỗi lấy tiến độ đồng bộ: {ex.Message}", 0, _authService.CurrentUserIid);
+                return null;
+            }
+        }
+
+        public async Task<JObject> SavePracticeTakeAsync(int practiceIid, int examScoIid, int courseIid, List<JToken> questions, string ri = null, string rit = null)
+        {
+            if (_authService == null || !_authService.IsAuthenticated) return null;
+
+            var endpoint = "/practice/api/save-take";
+            var requestUrl = $"{ApiService.WEB_ORIGIN}/learn/course/learn/{courseIid}";
+
+            var formData = new Dictionary<string, string>
+            {
+                { "take_id", "" },
+                { "finished", "1" },
+                { "time_start", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString() },
+                { "time_used", (questions.Count * 2.1).ToString("F3") },
+                { "score", "0" },
+                { "paper_score", questions.Count.ToString() },
+                { "exam_sco_iid", examScoIid.ToString() },
+                { "practice_iid", practiceIid.ToString() },
+                { "course_iid", courseIid.ToString() },
+                { "should_save_progress_for_course", "true" },
+                { "submit", "1" },
+                { "_sand_ajax", "1" },
+                { "_sand_platform", "3" },
+                { "_sand_readmin", "1" },
+                { "_sand_is_wan", "false" },
+                { "_sand_ga_sessionToken", "" },
+                { "_sand_ga_browserToken", "" },
+                { "_sand_domain", "truongson" },
+                { "_sand_masked", "" },
+                { "_sand_web_url", requestUrl },
+                { "_sand_device_uuid", AuthService.SandDeviceUuid },
+                { "_sand_session_id", AuthService.SandSessionId },
+                { "_sand_use_internal_network", "0" },
+                { "allow_cache_api_cdn", "1" },
+                { "_sand_token", _authService.CurrentToken },
+                { "_sand_uiid", _authService.CurrentUserIid.ToString() },
+                { "_sand_uid", _authService.CurrentUserId },
+                { "_sand_user_agent", AuthService.SandUserAgent },
+                { "_sand_ri", string.IsNullOrEmpty(ri) ? StudentCoursesRi : ri },
+                { "_sand_rit", string.IsNullOrEmpty(rit) ? StudentCoursesRit : rit }
+            };
+
+            for (int i = 0; i < questions.Count; i++)
+            {
+                var q = questions[i];
+                var qid = q["iid"]?.ToString() ?? "";
+                
+                formData[$"take_info[{i}][iid]"] = qid;
+                formData[$"take_info[{i}][touched]"] = "1";
+                formData[$"take_info[{i}][correct]"] = "1";
+                formData[$"take_info[{i}][incorrect]"] = "0";
+                formData[$"take_info[{i}][last]"] = "correct";
+                formData[$"take_info[{i}][spentTime]"] = "2.1"; // Mean time per question
+                formData[$"take_info[{i}][score]"] = "1";
+                formData[$"take_info[{i}][percent]"] = "100";
+                formData[$"take_info[{i}][weighted]"] = "1";
+                
+                formData[$"spent_time_each_question[{qid}][doing]"] = "2100";
+                formData[$"spent_time_each_question[{qid}][viewkey]"] = "1500";
+            }
+
+            var headers = new Dictionary<string, string>
+            {
+                { "Referer", requestUrl },
+                { "Origin", ApiService.WEB_ORIGIN },
+                { "User-Agent", AuthService.SandUserAgent }
+            };
+
+            try
+            {
+                return await _apiService.PostFormDataAsync<JObject>(endpoint, formData, headers);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error($"Lỗi save-take: {ex.Message}", 0, _authService.CurrentUserIid);
                 return null;
             }
         }

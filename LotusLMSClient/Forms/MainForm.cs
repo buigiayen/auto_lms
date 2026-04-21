@@ -124,13 +124,26 @@ namespace LotusLMSClient.Forms
         {
             var courseList = new CourseListControl(_authService);
 
-            // Khi lấy dữ liệu chi tiết của một Course, hiển thị giao diện Rubric như Bài thi
             courseList.OnCourseRubricLoaded = (course, rubricData) =>
             {
-                var detail = new ExamDetailControl(course, rubricData, new CourseService(new ApiService(), _authService));
-                // Nút Quay lại → quay về danh sách khóa học
-                detail.OnBack = () => LoadCourseList();
-                LoadUserControl(detail);
+                var service = new CourseService(new ApiService(), _authService);
+                
+                // Define a function to show/refresh the rubric view
+                Action showRubric = null;
+                showRubric = () => {
+                    var detail = new ExamDetailControl(course, rubricData, service);
+                    detail.OnRequestCourseView = (c, sDetails, isPractice) => 
+                    {
+                        var integrated = new CourseDetailControl(c, sDetails, service);
+                        integrated.OnBack = () => showRubric(); // Re-create rubric instead of using disposed 'detail'
+                        LoadUserControl(integrated);
+                        integrated.ApplyStartMode(isPractice);
+                    };
+                    detail.OnBack = () => LoadCourseList();
+                    LoadUserControl(detail);
+                };
+
+                showRubric();
             };
 
             // Giữ lại fallback cũ nếu cần
@@ -166,9 +179,23 @@ namespace LotusLMSClient.Forms
             
             examList.OnExamDetailLoaded = (course, result) =>
             {
-                var detail = new ExamDetailControl(course, result, new CourseService(new ApiService(), _authService));
-                detail.OnBack = () => LoadExamList();
-                LoadUserControl(detail);
+                var service = new CourseService(new ApiService(), _authService);
+                
+                Action showRubric = null;
+                showRubric = () => {
+                    var detail = new ExamDetailControl(course, result, service);
+                    detail.OnRequestCourseView = (c, sDetails, isPractice) => 
+                    {
+                        var integrated = new CourseDetailControl(c, sDetails, service);
+                        integrated.OnBack = () => showRubric();
+                        LoadUserControl(integrated);
+                        integrated.ApplyStartMode(isPractice);
+                    };
+                    detail.OnBack = () => LoadExamList();
+                    LoadUserControl(detail);
+                };
+
+                showRubric();
             };
 
             LoadUserControl(examList);

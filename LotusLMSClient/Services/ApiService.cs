@@ -10,7 +10,7 @@ namespace LotusLMSClient.Services
     {
         private readonly HttpClient _client;
         private const string BASE_URL = "https://staging-api.lotuslms.com";
-        public const string WEB_ORIGIN = "https://toandien.huelms.com";
+        public const string WEB_ORIGIN = "https://truongson.huelms.com";
         public const string WEB_LOGIN_URL = WEB_ORIGIN + "/user/login/?logout=1";
 
         public ApiService()
@@ -54,6 +54,33 @@ namespace LotusLMSClient.Services
                 {
                     Content = content
                 };
+
+                if (requestHeaders != null)
+                {
+                    foreach (var header in requestHeaders)
+                    {
+                        request.Headers.Remove(header.Key);
+                        request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                    }
+                }
+
+                var response = await _client.SendAsync(request);
+                response.EnsureSuccessStatusCode();
+
+                var jsonString = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<T>(jsonString);
+            }
+            catch (Exception ex)
+            {
+                throw new ApplicationException($"Lỗi kết nối tới server: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<T> GetAsync<T>(string endpoint, Dictionary<string, string> requestHeaders = null)
+        {
+            try
+            {
+                using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
 
                 if (requestHeaders != null)
                 {

@@ -35,12 +35,13 @@ namespace LotusLMSClient.UserControls
 
         private void SetupUI()
         {
-            this.BackColor = ColorPalette.ContentBg;
+            this.BackColor = Color.White;
             lblTitle.ForeColor = ColorPalette.TextPrimary;
             lblSubtitle.ForeColor = ColorPalette.TextSecondary;
             
             // Premium DataGridView Styling
-            dgvSessions.BackgroundColor = ColorPalette.CardBg;
+            dgvSessions.Dock = DockStyle.Fill;
+            dgvSessions.BackgroundColor = Color.White;
             dgvSessions.GridColor = Color.FromArgb(230, 230, 230);
             dgvSessions.BorderStyle = BorderStyle.None;
             dgvSessions.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
@@ -59,6 +60,7 @@ namespace LotusLMSClient.UserControls
             dgvSessions.DefaultCellStyle.Font = new Font("Segoe UI", 10F);
             dgvSessions.DefaultCellStyle.SelectionBackColor = Color.FromArgb(235, 245, 255);
             dgvSessions.DefaultCellStyle.SelectionForeColor = ColorPalette.Primary;
+            dgvSessions.ScrollBars = ScrollBars.Horizontal; // Tắt cuộn dọc vì ta sẽ cuộn bằng Panel cha
             
             // Alternating rows for readability
             dgvSessions.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(250, 250, 250);
@@ -177,9 +179,30 @@ namespace LotusLMSClient.UserControls
         public void DisplayTrackTimeData(SubjectDetails details)
         {
             dgvSessions.Rows.Clear();
-            if (details?.result?.children == null) return;
+            if (details?.result?.children == null)
+            {
+                UpdateHeightToFit();
+                return;
+            }
 
             AddItemsRecursive(details.result.children, 0);
+            UpdateHeightToFit();
+        }
+
+        public void UpdateHeightToFit()
+        {
+            if (this.IsDisposed) return;
+            if (this.InvokeRequired) { this.Invoke(new Action(UpdateHeightToFit)); return; }
+
+            int headerHeight = dgvSessions.ColumnHeadersVisible ? dgvSessions.ColumnHeadersHeight : 0;
+            int rowsHeight = 0;
+            foreach (DataGridViewRow row in dgvSessions.Rows)
+            {
+                if (row.Visible) rowsHeight += row.Height;
+            }
+
+            // Đặt chiều cao cho cả Control (cộng thêm một chút để không bị đè viền)
+            this.Height = headerHeight + rowsHeight + 5;
         }
 
         private void AddItemsRecursive(dynamic children, int depth)
@@ -188,6 +211,11 @@ namespace LotusLMSClient.UserControls
 
             foreach (var item in children)
             {
+                // Skip practice items - they will be shown in a dedicated section in CourseDetailControl
+                string ntype = string.Empty;
+                try { ntype = item.ntype?.ToString() ?? string.Empty; } catch { }
+                if (ntype == "practice") continue;
+
                 string indent = new string(' ', depth * 4);
 
                 // Add Row: Name, TimeSpent, Log (initially hidden)

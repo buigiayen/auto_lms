@@ -40,7 +40,7 @@ namespace LotusLMSClient.Services
                 { "_sand_is_wan", "false" },
                 { "_sand_ga_sessionToken", string.Empty },
                 { "_sand_ga_browserToken", string.Empty },
-                { "_sand_domain", "truongson" },
+                { "_sand_domain", "toandien" },
                 { "_sand_masked", string.Empty },
                 { "_sand_web_url", ApiService.WEB_LOGIN_URL },
                 { "_sand_device_uuid", SandDeviceUuid },

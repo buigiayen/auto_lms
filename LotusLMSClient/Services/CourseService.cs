@@ -51,7 +51,7 @@ namespace LotusLMSClient.Services
 
         private async Task<StudentEnrolmentPlansResponse> FetchStudentEnrolmentPlansResponseAsync()
         {
-            var endpoint = "/student/api/get-student-enrolment-plans?_sand_get_total=0&items_per_page=12&submit=1&page=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&_sand_ga_sessionToken=&_sand_ga_browserToken=&_sand_domain=truongson&_sand_masked=&_sand_session_id=2c710456-c150-42e1-85a6-f6e7ccbe7383&_sand_use_internal_network=0&allow_cache_api_cdn=1&_sand_user_agent=Mozilla/5.0%20(Windows%20NT%2010.0;%20Win64;%20x64)%20AppleWebKit/537.36%20(KHTML,%20like%20Gecko)%20Chrome/146.0.0.0%20Safari/537.36";
+            var endpoint = "/student/api/get-student-enrolment-plans?_sand_get_total=0&items_per_page=12&submit=1&page=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&_sand_ga_sessionToken=&_sand_ga_browserToken=&_sand_domain=toandien&_sand_masked=&_sand_session_id=2c710456-c150-42e1-85a6-f6e7ccbe7383&_sand_use_internal_network=0&allow_cache_api_cdn=1&_sand_user_agent=Mozilla/5.0%20(Windows%20NT%2010.0;%20Win64;%20x64)%20AppleWebKit/537.36%20(KHTML,%20like%20Gecko)%20Chrome/146.0.0.0%20Safari/537.36";
             var formData = new Dictionary<string, string>
             {
                 { "_sand_token", _authService.CurrentToken },
@@ -64,7 +64,7 @@ namespace LotusLMSClient.Services
 
         private async Task<StudentCoursesResponse> FetchStudentCoursesResponseAsync(int enrolmentPlanIid)
         {
-            var endpoint = $"/student/api/get-student-courses-in-enrolment-plan-table-view?_sand_get_total=0&items_per_page=20&enrolment_plan_iid={enrolmentPlanIid}&expand%5B%5D=syllabus&expand%5B%5D=score_by_rubric&submit=1&page=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&_sand_ga_sessionToken=&_sand_ga_browserToken=&_sand_domain=truongson&_sand_masked=&_sand_session_id={AuthService.SandSessionId}&_sand_use_internal_network=0&allow_cache_api_cdn=1&_sand_user_agent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20Chrome%2F146.0.0.0%20Safari%2F537.36";
+            var endpoint = $"/student/api/get-student-courses-in-enrolment-plan-table-view?_sand_get_total=0&items_per_page=20&enrolment_plan_iid={enrolmentPlanIid}&expand%5B%5D=syllabus&expand%5B%5D=score_by_rubric&submit=1&page=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&_sand_ga_sessionToken=&_sand_ga_browserToken=&_sand_domain=toandien&_sand_masked=&_sand_session_id={AuthService.SandSessionId}&_sand_use_internal_network=0&allow_cache_api_cdn=1&_sand_user_agent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20Chrome%2F146.0.0.0%20Safari%2F537.36";
             var formData = new Dictionary<string, string>
             {
                 { "_sand_web_url", $"{ApiService.WEB_ORIGIN}/student/ep/{enrolmentPlanIid}" },
@@ -88,7 +88,7 @@ namespace LotusLMSClient.Services
         {
             if (_authService == null || !_authService.IsAuthenticated) return false;
 
-            var endpoint = $"/student/api/get-detail-learning-time?enrolment_plan_iid={_enrolmentPlanIid}&course_iid={courseIid}&expand%5B%5D=current_unit&expand%5B%5D=current_unit_group&submit=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&_sand_ga_sessionToken=&_sand_ga_browserToken=&_sand_domain=truongson&_sand_masked=&_sand_session_id={AuthService.SandSessionId}&_sand_use_internal_network=0&allow_cache_api_cdn=1&_sand_user_agent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20Chrome%2F146.0.0.0%20Safari%2F537.36";
+            var endpoint = $"/student/api/get-detail-learning-time?enrolment_plan_iid={_enrolmentPlanIid}&course_iid={courseIid}&expand%5B%5D=current_unit&expand%5B%5D=current_unit_group&submit=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&_sand_ga_sessionToken=&_sand_ga_browserToken=&_sand_domain=toandien&_sand_masked=&_sand_session_id={AuthService.SandSessionId}&_sand_use_internal_network=0&allow_cache_api_cdn=1&_sand_user_agent=Mozilla%2F5.0%20(Windows%20NT%2010.0%3B%20Win64%3B%20x64)%20AppleWebKit%2F537.36%20(KHTML%2C%20like%20Gecko)%20Chrome%2F146.0.0.0%20Safari%2F537.36";
 
             var formData = new Dictionary<string, string>
             {
@@ -156,7 +156,7 @@ namespace LotusLMSClient.Services
                 { "item_ntype", itemNtype },
                 { "course_iid", courseIid.ToString() },
                 { "time_spent", timeSpent.ToString() },
-                { "_sand_domain", "truongson" },
+                { "_sand_domain", "toandien" },
                 { "_sand_web_url", requestUrl },
                 { "_sand_device_uuid", AuthService.SandDeviceUuid },
                 { "_sand_session_id", AuthService.SandSessionId },
@@ -225,7 +225,7 @@ namespace LotusLMSClient.Services
         {
             if (_authService == null || !_authService.IsAuthenticated) return KpiData.Empty;
 
-            var endpoint = $"/time-tracking/learning-time-tracking/today-gained-kpi-time?user_iid={_authService.CurrentUserIid}&submit=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&_sand_ga_sessionToken=&_sand_ga_browserToken=&_sand_domain=truongson&_sand_masked=&_sand_session_id={AuthService.SandSessionId}&_sand_use_internal_network=0&allow_cache_api_cdn=1&_sand_user_agent={Uri.EscapeDataString(AuthService.SandUserAgent)}";
+            var endpoint = $"/time-tracking/learning-time-tracking/today-gained-kpi-time?user_iid={_authService.CurrentUserIid}&submit=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&_sand_ga_sessionToken=&_sand_ga_browserToken=&_sand_domain=toandien&_sand_masked=&_sand_session_id={AuthService.SandSessionId}&_sand_use_internal_network=0&allow_cache_api_cdn=1&_sand_user_agent={Uri.EscapeDataString(AuthService.SandUserAgent)}";
 
             var requestUrl = $"{ApiService.WEB_ORIGIN}/learn/course/learn/{courseIid}";
 
@@ -466,7 +466,7 @@ namespace LotusLMSClient.Services
         {
             if (_authService == null || !_authService.IsAuthenticated) return null;
 
-            var endpoint = $"/course/api/get-course?ntype=course&depth=1&editing_syllabus=1&ciid={courseIid}&_sand_expand%5B%5D=score_by_rubric&iid={courseIid}&submit=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&_sand_ga_sessionToken=&_sand_ga_browserToken=&_sand_domain=truongson&_sand_masked=&_sand_session_id={AuthService.SandSessionId}&_sand_use_internal_network=0&allow_cache_api_cdn=1&_sand_user_agent={Uri.EscapeDataString(AuthService.SandUserAgent)}";
+            var endpoint = $"/course/api/get-course?ntype=course&depth=1&editing_syllabus=1&ciid={courseIid}&_sand_expand%5B%5D=score_by_rubric&iid={courseIid}&submit=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&_sand_ga_sessionToken=&_sand_ga_browserToken=&_sand_domain=toandien&_sand_masked=&_sand_session_id={AuthService.SandSessionId}&_sand_use_internal_network=0&allow_cache_api_cdn=1&_sand_user_agent={Uri.EscapeDataString(AuthService.SandUserAgent)}";
 
             var webUrl = $"{ApiService.WEB_ORIGIN}/student/course/{courseIid}/dashboard";
             var formData = new Dictionary<string, string>
@@ -501,7 +501,7 @@ namespace LotusLMSClient.Services
         {
             if (_authService == null || !_authService.IsAuthenticated) return null;
 
-            var endpoint = $"/practice/api/get-practice-detail?practice_iid={practiceIid}&course_iid={courseIid}&_sand_expand%5B%5D=exam_sco&submit=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&_sand_ga_sessionToken=&_sand_ga_browserToken=&_sand_domain=truongson&_sand_masked=&_sand_session_id={AuthService.SandSessionId}&_sand_use_internal_network=0&allow_cache_api_cdn=1&_sand_user_agent={Uri.EscapeDataString(AuthService.SandUserAgent)}";
+            var endpoint = $"/practice/api/get-practice-detail?practice_iid={practiceIid}&course_iid={courseIid}&_sand_expand%5B%5D=exam_sco&submit=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&_sand_ga_sessionToken=&_sand_ga_browserToken=&_sand_domain=toandien&_sand_masked=&_sand_session_id={AuthService.SandSessionId}&_sand_use_internal_network=0&allow_cache_api_cdn=1&_sand_user_agent={Uri.EscapeDataString(AuthService.SandUserAgent)}";
 
             var requestUrl = $"{ApiService.WEB_ORIGIN}/learn/course/learn/{courseIid}";
 
@@ -534,7 +534,7 @@ namespace LotusLMSClient.Services
             }
         }
         
-        public async Task<JObject> GetQuestionBankStatusAsync(int examTemplateIid, int bankIid, int courseIid)
+        public async Task<JObject> GetQuestionBankStatusAsync(int examScoIid, int bankIid, int courseIid)
         {
             if (_authService == null || !_authService.IsAuthenticated) return null;
 
@@ -544,10 +544,10 @@ namespace LotusLMSClient.Services
             
             var endpoint = $"/practice/api/get-question-bank-status?" +
                            $"bank_iids[]={bankIid}&" +
-                           $"exam_template_iid={examTemplateIid}&" +
+                           $"exam_template_iid={examScoIid}&" +
                            $"last_ts=0&submit=1&_sand_ajax=1&_sand_platform=3&_sand_readmin=1&_sand_is_wan=false&" +
                            $"_sand_ga_sessionToken=&_sand_ga_browserToken=&" +
-                           $"_sand_domain=truongson&_sand_masked=&" +
+                           $"_sand_domain=toandien&_sand_masked=&" +
                            $"_sand_session_id={sessionId}&" +
                            $"_sand_use_internal_network=0&allow_cache_api_cdn=1&" +
                            $"_sand_user_agent={Uri.EscapeDataString(userAgent)}";
@@ -568,6 +568,135 @@ namespace LotusLMSClient.Services
             catch (Exception ex)
             {
                 AppLog.Error($"Lỗi lấy trạng thái ngân hàng câu hỏi (GET): {ex.Message}", 0, _authService.CurrentUserIid);
+                return null;
+            }
+        }
+
+        public async Task<JObject> GetSyncPracticeProgressAsync(int practiceIid, int examScoIid, int courseIid, string ri = null, string rit = null)
+        {
+            if (_authService == null || !_authService.IsAuthenticated) return null;
+
+            var endpoint = "/practice/api/get-sync-practice-progress";
+            var requestUrl = $"{ApiService.WEB_ORIGIN}/learn/course/learn/{courseIid}";
+
+            var formData = new Dictionary<string, string>
+            {
+                { "practice_iid", practiceIid.ToString() },
+                { "exam_sco_iid", examScoIid.ToString() },
+                { "submit", "1" },
+                { "_sand_ajax", "1" },
+                { "_sand_platform", "3" },
+                { "_sand_readmin", "1" },
+                { "_sand_is_wan", "false" },
+                { "_sand_ga_sessionToken", "" },
+                { "_sand_ga_browserToken", "" },
+                { "_sand_domain", "toandien" },
+                { "_sand_masked", "" },
+                { "_sand_web_url", requestUrl },
+                { "_sand_device_uuid", AuthService.SandDeviceUuid },
+                { "_sand_session_id", AuthService.SandSessionId },
+                { "_sand_use_internal_network", "0" },
+                { "allow_cache_api_cdn", "1" },
+                { "_sand_token", _authService.CurrentToken },
+                { "_sand_uiid", _authService.CurrentUserIid.ToString() },
+                { "_sand_uid", _authService.CurrentUserId },
+                { "_sand_user_agent", AuthService.SandUserAgent },
+                { "_sand_ri", ri ?? StudentCoursesRi },
+                { "_sand_rit", rit ?? StudentCoursesRit }
+            };
+
+            var headers = new Dictionary<string, string>
+            {
+                { "Referer", requestUrl },
+                { "Origin", ApiService.WEB_ORIGIN },
+                { "User-Agent", AuthService.SandUserAgent }
+            };
+
+            try
+            {
+                return await _apiService.PostFormDataAsync<JObject>(endpoint, formData, headers);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error($"Lỗi lấy tiến độ đồng bộ: {ex.Message}", 0, _authService.CurrentUserIid);
+                return null;
+            }
+        }
+
+        public async Task<JObject> SavePracticeTakeAsync(int practiceIid, int examScoIid, int courseIid, List<JToken> questions, string ri = null, string rit = null)
+        {
+            if (_authService == null || !_authService.IsAuthenticated) return null;
+
+            var endpoint = "/practice/api/save-take";
+            var requestUrl = $"{ApiService.WEB_ORIGIN}/learn/course/learn/{courseIid}";
+
+            var formData = new Dictionary<string, string>
+            {
+                { "take_id", "" },
+                { "finished", "1" },
+                { "time_start", DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString() },
+                { "time_used", (questions.Count * 2.1).ToString("F3") },
+                { "score", "0" },
+                { "paper_score", questions.Count.ToString() },
+                { "exam_sco_iid", examScoIid.ToString() },
+                { "practice_iid", practiceIid.ToString() },
+                { "course_iid", courseIid.ToString() },
+                { "should_save_progress_for_course", "true" },
+                { "submit", "1" },
+                { "_sand_ajax", "1" },
+                { "_sand_platform", "3" },
+                { "_sand_readmin", "1" },
+                { "_sand_is_wan", "false" },
+                { "_sand_ga_sessionToken", "" },
+                { "_sand_ga_browserToken", "" },
+                { "_sand_domain", "toandien" },
+                { "_sand_masked", "" },
+                { "_sand_web_url", requestUrl },
+                { "_sand_device_uuid", AuthService.SandDeviceUuid },
+                { "_sand_session_id", AuthService.SandSessionId },
+                { "_sand_use_internal_network", "0" },
+                { "allow_cache_api_cdn", "1" },
+                { "_sand_token", _authService.CurrentToken },
+                { "_sand_uiid", _authService.CurrentUserIid.ToString() },
+                { "_sand_uid", _authService.CurrentUserId },
+                { "_sand_user_agent", AuthService.SandUserAgent },
+                { "_sand_ri", ri ?? StudentCoursesRi },
+                { "_sand_rit", rit ?? StudentCoursesRit }
+            };
+
+            for (int i = 0; i < questions.Count; i++)
+            {
+                var q = questions[i];
+                var qid = q["iid"]?.ToString() ?? "";
+                
+                formData[$"take_info[{i}][iid]"] = qid;
+                formData[$"take_info[{i}][touched]"] = "1";
+                formData[$"take_info[{i}][correct]"] = "1";
+                formData[$"take_info[{i}][incorrect]"] = "0";
+                formData[$"take_info[{i}][last]"] = "correct";
+                formData[$"take_info[{i}][spentTime]"] = "2.1"; // Mean time per question
+                formData[$"take_info[{i}][score]"] = "1";
+                formData[$"take_info[{i}][percent]"] = "100";
+                formData[$"take_info[{i}][weighted]"] = "1";
+                
+                formData[$"spent_time_each_question[{qid}][doing]"] = "2100";
+                formData[$"spent_time_each_question[{qid}][viewkey]"] = "1500";
+            }
+
+            var headers = new Dictionary<string, string>
+            {
+                { "Referer", requestUrl },
+                { "Origin", ApiService.WEB_ORIGIN },
+                { "User-Agent", AuthService.SandUserAgent }
+            };
+
+            try
+            {
+                return await _apiService.PostFormDataAsync<JObject>(endpoint, formData, headers);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error($"Lỗi save-take: {ex.Message}", 0, _authService.CurrentUserIid);
                 return null;
             }
         }

@@ -10,7 +10,7 @@ namespace LotusLMSClient.Services
     {
         private readonly HttpClient _client;
         private const string BASE_URL = "https://staging-api.lotuslms.com";
-        public const string WEB_ORIGIN = "https://truongson.huelms.com";
+        public const string WEB_ORIGIN = "https://toandien.huelms.com";
         public const string WEB_LOGIN_URL = WEB_ORIGIN + "/user/login/?logout=1";
 
         public ApiService()

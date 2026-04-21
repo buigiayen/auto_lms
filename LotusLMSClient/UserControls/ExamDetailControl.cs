@@ -120,11 +120,34 @@ namespace LotusLMSClient.UserControls
             progressTime.Value = (int)Math.Min(100, cp);
             lblPercent.Text = $"{cp:F1}%";
 
-            double score = expanded?.Score ?? _result.P ?? _result.Score ?? 0;
+            var items = expanded?.Items;
             
-            // DYNAMIC SCORES
-            double maxScore = expanded?.Items?.Find(i => i.Name != null && i.Name.Contains("Tiến độ môn học"))?.MaxScore ?? 0;
-            if (maxScore == 0) maxScore = _result.Rubric?.MaxScore ?? 25;
+            // DYNAMIC SCORES CALCULATION
+            double score = 0;
+            double maxScore = 0;
+
+            if (items != null && items.Count > 0)
+            {
+                foreach (var item in items)
+                {
+                    if (item.Name == null) continue;
+                    if (item.Name.Contains("[2025]")) continue;
+
+                    // Chỉ cộng từ các danh mục tiến độ chính đã yêu cầu
+                    if (item.Name.Contains("Xem giáo trình") || 
+                        item.Name.Contains("Ôn luyện") || 
+                        item.Name.Contains("Kiểm tra"))
+                    {
+                        // Kiểm tra nếu nó không phải là nút cha (nếu có cách xác định) 
+                        // Hoặc tin tưởng vào các text cụ thể này thường là leaf/metric chính
+                        score += item.Score ?? 0;
+                        maxScore += item.MaxScore ?? 0;
+                    }
+                }
+            }
+
+            if (maxScore == 0) maxScore = _result.Rubric?.MaxScore ?? 0;
+            if (score == 0) score = expanded?.Score ?? _result.P ?? _result.Score ?? 0;
             
             double passScore = _result.Rubric?.PassScore ?? (maxScore * 0.7);
 
@@ -138,7 +161,7 @@ namespace LotusLMSClient.UserControls
             // Center the flow layout manually
             if (this.Width > 0) flpSummary.Left = (this.Width - flpSummary.Width) / 2;
             dgvScores.Rows.Clear();
-            var items = expanded?.Items;
+            // Items already defined above
             if (items != null)
             {
                 foreach (var item in items)

@@ -155,6 +155,33 @@ namespace LotusLMSClient.UserControls
                 return;
             }
 
+            // DYNAMIC HOURS CALCULATION (Optional refinement of Gained time)
+            if (_rawData?.result != null)
+            {
+                try 
+                {
+                    var rootNode = Newtonsoft.Json.Linq.JToken.FromObject(_rawData.result);
+                    var (treeGained, treeReq) = CalculateTotalTimeFromTree(rootNode);
+
+                    // If the tree summation found more actual learning time than the KPI API, 
+                    // we can update the gained time, but we KEEP the RequiredTime from the KPI (12h).
+                    if (treeGained > data.GainedTime)
+                    {
+                        data.GainedTime = treeGained;
+                        double gainedHours = treeGained / 3600.0;
+                        double requiredHours = data.RequiredTime / 3600.0;
+
+                        if (gainedHours % 1 == 0 && requiredHours % 1 == 0)
+                            data.FormattedProgress = $"{(int)gainedHours}/{(int)requiredHours} giờ";
+                        else
+                            data.FormattedProgress = $"{gainedHours:F2}/{requiredHours:F1} giờ";
+                            
+                        data.IsReached = treeGained >= data.RequiredTime;
+                    }
+                }
+                catch { }
+            }
+
             _lblKpiInfo.Text = $"⏱ Thời gian đã học hôm nay: {data.FormattedProgress}";
             if (data.IsReached)
             {
@@ -165,6 +192,43 @@ namespace LotusLMSClient.UserControls
             {
                 _lblKpiInfo.ForeColor = Color.FromArgb(220, 220, 220);
             }
+        }
+
+        private (int gained, int required) CalculateTotalTimeFromTree(Newtonsoft.Json.Linq.JToken node)
+        {
+            int gained = 0;
+            int required = 0;
+
+            if (node == null) return (0, 0);
+
+            var children = node["children"] as Newtonsoft.Json.Linq.JArray;
+            bool isLeaf = children == null || children.Count == 0;
+
+            // Only add time for leaf nodes to avoid double-counting parent folder aggregates
+            if (isLeaf)
+            {
+                // Gained time
+                if (node["actual_learning_time"] != null)
+                    gained += node["actual_learning_time"].Value<int>();
+
+                // Required time - Use 'learning_time' or 'duration'
+                if (node["learning_time"] != null)
+                    required += node["learning_time"].Value<int>();
+                else if (node["duration"] != null && int.TryParse(node["duration"].ToString(), out int dur))
+                    required += dur;
+            }
+
+            if (children != null)
+            {
+                foreach (var child in children)
+                {
+                    var (childGained, childReq) = CalculateTotalTimeFromTree(child);
+                    gained += childGained;
+                    required += childReq;
+                }
+            }
+
+            return (gained, required);
         }
 
         private void BuildContent()
@@ -498,20 +562,35 @@ namespace LotusLMSClient.UserControls
                 }
             }
 
-            // 3. Fallback sang kết quả Sync nếu Stats chính thức chưa có hoặc bằng 0
-            if (right == 0 && wrong == 0 && progress != null && progress["result"] != null)
+            // 3. Ưu tiên tính toán từ Sync Data để đảm bảo tính duy nhất theo iid
+            if (progress != null && progress["result"] != null)
             {
                 var res = progress["result"];
-                right = res["correct"]?.Value<int>() ?? 0;
-                wrong = res["incorrect"]?.Value<int>() ?? 0;
                 
-                if (right == 0 && wrong == 0 && res["sync_data"] is JArray syncData)
+                if (res["sync_data"] is JArray syncData && syncData.Count > 0)
                 {
+                    // Sử dụng Dictionary để lọc duy nhất theo iid câu hỏi
+                    // Key: iid, Value: IsCorrect
+                    var questionStatus = new Dictionary<string, bool>();
+                    
                     foreach (var item in syncData)
                     {
-                        right += item["correct"]?.Value<int>() ?? 0;
-                        wrong += item["incorrect"]?.Value<int>() ?? 0;
+                        string qid = item["iid"]?.ToString();
+                        if (string.IsNullOrEmpty(qid)) continue;
+
+                        bool isCorrect = (item["correct"]?.Value<int>() ?? 0) > 0;
+                        // Ghi đè trạng thái mới nhất cho cùng một iid
+                        questionStatus[qid] = isCorrect;
                     }
+
+                    right = questionStatus.Values.Count(v => v == true);
+                    wrong = questionStatus.Values.Count(v => v == false);
+                }
+                else if (right == 0 && wrong == 0)
+                {
+                    // Fallback sang correct/incorrect từ API nếu sync_data trống
+                    right = res["correct"]?.Value<int>() ?? 0;
+                    wrong = res["incorrect"]?.Value<int>() ?? 0;
                 }
                 
                 if (res["total"] != null && !overrideTotal.HasValue && total == 0) 

@@ -49,7 +49,8 @@ namespace LotusLMSClient.Services
                 { "allow_cache_api_cdn", "1" },
                 { "_sand_user_agent", SandUserAgent },
                 { "_sand_ri", "8cbcfef31fd3b4c730a90124640619ad" },
-                { "_sand_rit", "ddfd1e7d986bb7743a479117dc72a574:1ebBJRNcQOy0/fovqo+ofL9ulu1gaNqOhkaK+L9TCUoVtMWHmFxib42uF9K1ymlb" }
+                { "_sand_rit", "ddfd1e7d986bb7743a479117dc72a574:1ebBJRNcQOy0/fovqo+ofL9ulu1gaNqOhkaK+L9TCUoVtMWHmFxib42uF9K1ymlb" },
+                { "_sand_client_sync_token", "n:c1da89127987252489739834" }
             };
 
             try

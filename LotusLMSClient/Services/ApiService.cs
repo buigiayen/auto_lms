@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using LotusLMSClient.Helpers;
 
 namespace LotusLMSClient.Services
 {
@@ -31,16 +32,14 @@ namespace LotusLMSClient.Services
             _client.DefaultRequestHeaders.TryAddWithoutValidation("Referer", WEB_LOGIN_URL);
         }
 
+        private string _token;
+
         public void SetAuthToken(string token)
         {
-            if (_client.DefaultRequestHeaders.Contains("Authorization"))
-            {
-                _client.DefaultRequestHeaders.Remove("Authorization");
-            }
-            _client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+            _token = token;
         }
 
-        public async Task<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, string> formData, Dictionary<string, string> requestHeaders = null)
+        public async Task<T> PostFormDataAsync<T>(string endpoint, Dictionary<string, string> formData, Dictionary<string, string> requestHeaders = null, bool sendAuth = false)
         {
             try
             {
@@ -55,6 +54,11 @@ namespace LotusLMSClient.Services
                     Content = content
                 };
 
+                if (sendAuth && !string.IsNullOrEmpty(_token))
+                {
+                    request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {_token}");
+                }
+
                 if (requestHeaders != null)
                 {
                     foreach (var header in requestHeaders)
@@ -64,24 +68,49 @@ namespace LotusLMSClient.Services
                     }
                 }
 
+                string reqPayload = string.Empty;
+                if (formData != null)
+                {
+                    var parts = new List<string>();
+                    foreach (var kvp in formData)
+                    {
+                        parts.Add($"{kvp.Key}={kvp.Value}");
+                    }
+                    reqPayload = string.Join("&", parts);
+                }
+
                 var response = await _client.SendAsync(request);
+                var responseContent = string.Empty;
+                try
+                {
+                    responseContent = await response.Content.ReadAsStringAsync();
+                }
+                catch {}
+
+                AppLog.Info($"[API POST] {endpoint} | Payload: {reqPayload} | Status: {response.StatusCode} | Response: {responseContent}");
+
                 response.EnsureSuccessStatusCode();
 
-                var jsonString = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<T>(jsonString);
+                return JsonConvert.DeserializeObject<T>(responseContent);
             }
             catch (Exception ex)
             {
+                AppLog.Error($"[API Exception] POST {endpoint} failed: {ex.Message}");
                 throw new ApplicationException($"Lỗi kết nối tới server: {ex.Message}", ex);
             }
         }
 
-        public async Task<T> GetAsync<T>(string endpoint, Dictionary<string, string> requestHeaders = null)
+        public async Task<T> GetAsync<T>(string endpoint, Dictionary<string, string> requestHeaders = null, bool sendAuth = false)
         {
             try
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
 
+                if (sendAuth && !string.IsNullOrEmpty(_token))
+                {
+                    request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {_token}");
+                }
+
                 if (requestHeaders != null)
                 {
                     foreach (var header in requestHeaders)
@@ -92,13 +121,22 @@ namespace LotusLMSClient.Services
                 }
 
                 var response = await _client.SendAsync(request);
+                var responseContent = string.Empty;
+                try
+                {
+                    responseContent = await response.Content.ReadAsStringAsync();
+                }
+                catch {}
+
+                AppLog.Info($"[API GET] {endpoint} | Status: {response.StatusCode} | Response: {responseContent}");
+
                 response.EnsureSuccessStatusCode();
 
-                var jsonString = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<T>(jsonString);
+                return JsonConvert.DeserializeObject<T>(responseContent);
             }
             catch (Exception ex)
             {
+                AppLog.Error($"[API Exception] GET {endpoint} failed: {ex.Message}");
                 throw new ApplicationException($"Lỗi kết nối tới server: {ex.Message}", ex);
             }
         }

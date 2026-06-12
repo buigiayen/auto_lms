@@ -56,10 +56,11 @@ namespace LotusLMSClient.Services
             {
                 { "_sand_token", _authService.CurrentToken },
                 { "_sand_uiid", _authService.CurrentUserIid.ToString() },
-                { "_sand_uid", _authService.CurrentUserId }
+                { "_sand_uid", _authService.CurrentUserId },
+                { "_sand_client_sync_token", "n:c1da89127987252489739834" }
             };
 
-            return await _apiService.PostFormDataAsync<StudentEnrolmentPlansResponse>(endpoint, formData);
+            return await _apiService.PostFormDataAsync<StudentEnrolmentPlansResponse>(endpoint, formData, sendAuth: false);
         }
 
         private async Task<StudentCoursesResponse> FetchStudentCoursesResponseAsync(int enrolmentPlanIid)
@@ -73,7 +74,8 @@ namespace LotusLMSClient.Services
                 { "_sand_uiid", _authService.CurrentUserIid.ToString() },
                 { "_sand_uid", _authService.CurrentUserId },
                 { "_sand_ri", StudentCoursesRi },
-                { "_sand_rit", StudentCoursesRit }
+                { "_sand_rit", StudentCoursesRit },
+                { "_sand_client_sync_token", "n:c1da89127987252489739834" }
             };
 
             var headers = new Dictionary<string, string>
@@ -81,7 +83,7 @@ namespace LotusLMSClient.Services
                 { "Referer", $"{ApiService.WEB_ORIGIN}/student/ep/{enrolmentPlanIid}" }
             };
 
-            return await _apiService.PostFormDataAsync<StudentCoursesResponse>(endpoint, formData, headers);
+            return await _apiService.PostFormDataAsync<StudentCoursesResponse>(endpoint, formData, headers, sendAuth: false);
         }
 
          public async Task<bool> ReportLearningTimeAsync(int courseIid)
@@ -96,7 +98,8 @@ namespace LotusLMSClient.Services
                 { "_sand_device_uuid", AuthService.SandDeviceUuid },
                 { "_sand_token", _authService.CurrentToken },
                 { "_sand_uiid", _authService.CurrentUserIid.ToString() },
-                { "_sand_uid", _authService.CurrentUserId }
+                { "_sand_uid", _authService.CurrentUserId },
+                { "_sand_client_sync_token", "n:c1da89127987252489739834" }
             };
 
             var headers = new Dictionary<string, string>
@@ -130,7 +133,8 @@ namespace LotusLMSClient.Services
                 { "_sand_uiid", _authService.CurrentUserIid.ToString() },
                 { "_sand_uid", _authService.CurrentUserId },
                 { "_sand_ri", StudentCoursesRi },
-                { "_sand_rit", StudentCoursesRit }
+                { "_sand_rit", StudentCoursesRit },
+                { "_sand_client_sync_token", "n:c1da89127987252489739834" }
             };
 
             var headers = new Dictionary<string, string> { { "Referer", $"{ApiService.WEB_ORIGIN}/student/course/{courseIid}" } };
@@ -165,7 +169,8 @@ namespace LotusLMSClient.Services
                 { "_sand_uid", _authService.CurrentUserId },
                 { "_sand_user_agent", AuthService.SandUserAgent },
                 { "_sand_ri", StudentCoursesRi },
-                { "_sand_rit", StudentCoursesRit }
+                { "_sand_rit", StudentCoursesRit },
+                { "_sand_client_sync_token", "n:c1da89127987252489739834" }
             };
 
             var headers = new Dictionary<string, string> 
@@ -210,7 +215,8 @@ namespace LotusLMSClient.Services
                 { "_sand_uid", _authService.CurrentUserId },
                 { "_sand_user_agent", AuthService.SandUserAgent },
                 { "_sand_ri", StudentCoursesRi },
-                { "_sand_rit", StudentCoursesRit }
+                { "_sand_rit", StudentCoursesRit },
+                { "_sand_client_sync_token", "n:c1da89127987252489739834" }
             };
             try
             {
@@ -237,7 +243,8 @@ namespace LotusLMSClient.Services
                 { "_sand_uiid", _authService.CurrentUserIid.ToString() },
                 { "_sand_uid", _authService.CurrentUserId },
                 { "_sand_ri", StudentCoursesRi },
-                { "_sand_rit", StudentCoursesRit }
+                { "_sand_rit", StudentCoursesRit },
+                { "_sand_client_sync_token", "n:c1da89127987252489739834" }
             };
 
             var headers = new Dictionary<string, string>
@@ -495,7 +502,8 @@ namespace LotusLMSClient.Services
                 { "_sand_uiid", _authService.CurrentUserIid.ToString() },
                 { "_sand_uid", _authService.CurrentUserId },
                 { "_sand_ri", StudentCoursesRi },
-                { "_sand_rit", StudentCoursesRit }
+                { "_sand_rit", StudentCoursesRit },
+                { "_sand_client_sync_token", "n:c1da89127987252489739834" }
             };
 
             var headers = new Dictionary<string, string>
@@ -531,7 +539,8 @@ namespace LotusLMSClient.Services
                 { "_sand_uiid", _authService.CurrentUserIid.ToString() },
                 { "_sand_uid", _authService.CurrentUserId },
                 { "_sand_ri", StudentCoursesRi },
-                { "_sand_rit", StudentCoursesRit }
+                { "_sand_rit", StudentCoursesRit },
+                { "_sand_client_sync_token", "n:c1da89127987252489739834" }
             };
 
             var headers = new Dictionary<string, string>
@@ -620,7 +629,8 @@ namespace LotusLMSClient.Services
                 { "_sand_uid", _authService.CurrentUserId },
                 { "_sand_user_agent", AuthService.SandUserAgent },
                 { "_sand_ri", string.IsNullOrEmpty(ri) ? StudentCoursesRi : ri },
-                { "_sand_rit", string.IsNullOrEmpty(rit) ? StudentCoursesRit : rit }
+                { "_sand_rit", string.IsNullOrEmpty(rit) ? StudentCoursesRit : rit },
+                { "_sand_client_sync_token", "n:c1da89127987252489739834" }
             };
 
             var headers = new Dictionary<string, string>
@@ -679,7 +689,8 @@ namespace LotusLMSClient.Services
                 { "_sand_uid", _authService.CurrentUserId },
                 { "_sand_user_agent", AuthService.SandUserAgent },
                 { "_sand_ri", string.IsNullOrEmpty(ri) ? StudentCoursesRi : ri },
-                { "_sand_rit", string.IsNullOrEmpty(rit) ? StudentCoursesRit : rit }
+                { "_sand_rit", string.IsNullOrEmpty(rit) ? StudentCoursesRit : rit },
+                { "_sand_client_sync_token", "n:c1da89127987252489739834" }
             };
 
             for (int i = 0; i < questions.Count; i++)

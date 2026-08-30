@@ -45,7 +45,7 @@ Dự án là ứng dụng **Windows Forms (.NET 8)** để đăng nhập và là
 
 Ngoài ra có:
 - `dotnet-install.ps1` — script cài .NET SDK chính thức.
-- `truongson.huelms.com/static/js/81777.d76fce6e.js` — file JS bundle ngoài luồng WinForms (không phải core C# app).
+- `yenthuy.huelms.com/static/js/81777.d76fce6e.js` — file JS bundle ngoài luồng WinForms (không phải core C# app).
 
 ---
 
@@ -127,7 +127,7 @@ Headers/form-data có nhiều trường `_sand_*` để giả lập context web 
 
 ## 9) Điểm cần lưu ý kỹ thuật (quan trọng)
 1. **Nhiều giá trị hard-code trong source** (`_sand_ri`, `_sand_rit`, session id, user agent, domain...).
-2. **Base API là staging**, nhưng web origin/referer lại dùng domain thật `truongson.huelms.com`.
+2. **Base API là staging**, nhưng web origin/referer lại dùng domain thật `yenthuy.huelms.com`.
 3. `App.config` đang có `supportedRuntime` kiểu .NET Framework 4.8, trong khi project là .NET 8 WinForms (khả năng là legacy artifact).
 4. Một số chỗ `catch {}` nuốt lỗi hoàn toàn -> khó debug khi lỗi runtime/API.
 5. `SubjectDetails.cs` rất lớn (model lồng sâu), khó bảo trì nếu schema API đổi.

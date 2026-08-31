@@ -11,7 +11,7 @@ namespace LotusLMSClient.Services
     {
         private readonly HttpClient _client;
         private const string BASE_URL = "https://staging-api.lotuslms.com";
-        public const string WEB_ORIGIN = "https://truongson.huelms.com";
+        public const string WEB_ORIGIN = "https://yenthuy.huelms.com";
         public const string WEB_LOGIN_URL = WEB_ORIGIN + "/user/login/?logout=1";
 
         public ApiService()
@@ -28,6 +28,10 @@ namespace LotusLMSClient.Services
             _client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua", "\"Not-A.Brand\";v=\"24\", \"Chromium\";v=\"146\"");
             _client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Ch-Ua-Mobile", "?0");
             _client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36");
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Fetch-Site", "cross-site");
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Fetch-Mode", "cors");
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Fetch-Dest", "empty");
+            _client.DefaultRequestHeaders.TryAddWithoutValidation("Priority", "u=1, i");
             _client.DefaultRequestHeaders.TryAddWithoutValidation("Origin", WEB_ORIGIN);
             _client.DefaultRequestHeaders.TryAddWithoutValidation("Referer", WEB_LOGIN_URL);
         }
@@ -43,11 +47,8 @@ namespace LotusLMSClient.Services
         {
             try
             {
-                var content = new MultipartFormDataContent();
-                foreach (var kvp in formData)
-                {
-                    content.Add(new StringContent(kvp.Value), kvp.Key);
-                }
+                // Dùng FormUrlEncodedContent (application/x-www-form-urlencoded) — giống curl --data-urlencode
+                var content = new FormUrlEncodedContent(formData);
 
                 using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
                 {
@@ -96,6 +97,51 @@ namespace LotusLMSClient.Services
             catch (Exception ex)
             {
                 AppLog.Error($"[API Exception] POST {endpoint} failed: {ex.Message}");
+                throw new ApplicationException($"Lỗi kết nối tới server: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<T> PostMultipartFormDataAsync<T>(string endpoint, List<KeyValuePair<string, string>> formData, Dictionary<string, string> requestHeaders = null)
+        {
+            try
+            {
+                var content = new MultipartFormDataContent();
+                foreach (var kvp in formData)
+                {
+                    content.Add(new StringContent(kvp.Value ?? ""), kvp.Key);
+                }
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+                {
+                    Content = content
+                };
+
+                if (requestHeaders != null)
+                {
+                    foreach (var header in requestHeaders)
+                    {
+                        request.Headers.Remove(header.Key);
+                        request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                    }
+                }
+
+                var response = await _client.SendAsync(request);
+                var responseContent = string.Empty;
+                try
+                {
+                    responseContent = await response.Content.ReadAsStringAsync();
+                }
+                catch { }
+
+                AppLog.Info($"[API POST Multipart] {endpoint} | Status: {response.StatusCode} | Response: {responseContent}");
+
+                response.EnsureSuccessStatusCode();
+
+                return JsonConvert.DeserializeObject<T>(responseContent);
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error($"[API Exception] POST Multipart {endpoint} failed: {ex.Message}");
                 throw new ApplicationException($"Lỗi kết nối tới server: {ex.Message}", ex);
             }
         }

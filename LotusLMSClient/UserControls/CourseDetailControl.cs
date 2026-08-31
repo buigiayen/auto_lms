@@ -155,33 +155,6 @@ namespace LotusLMSClient.UserControls
                 return;
             }
 
-            // DYNAMIC HOURS CALCULATION (Optional refinement of Gained time)
-            if (_rawData?.result != null)
-            {
-                try 
-                {
-                    var rootNode = Newtonsoft.Json.Linq.JToken.FromObject(_rawData.result);
-                    var (treeGained, treeReq) = CalculateTotalTimeFromTree(rootNode);
-
-                    // If the tree summation found more actual learning time than the KPI API, 
-                    // we can update the gained time, but we KEEP the RequiredTime from the KPI (12h).
-                    if (treeGained > data.GainedTime)
-                    {
-                        data.GainedTime = treeGained;
-                        double gainedHours = treeGained / 3600.0;
-                        double requiredHours = data.RequiredTime / 3600.0;
-
-                        if (gainedHours % 1 == 0 && requiredHours % 1 == 0)
-                            data.FormattedProgress = $"{(int)gainedHours}/{(int)requiredHours} giờ";
-                        else
-                            data.FormattedProgress = $"{gainedHours:F2}/{requiredHours:F1} giờ";
-                            
-                        data.IsReached = treeGained >= data.RequiredTime;
-                    }
-                }
-                catch { }
-            }
-
             _lblKpiInfo.Text = $"⏱ Thời gian đã học hôm nay: {data.FormattedProgress}";
             if (data.IsReached)
             {
@@ -642,77 +615,88 @@ namespace LotusLMSClient.UserControls
 
         private async Task HandleAutoPracticeAsync()
         {
-            if (_practiceIid == 0 || !_practiceExamScoIid.HasValue || !_practiceBankIid.HasValue) 
+            if (_practiceIid == 0 || !_practiceExamScoIid.HasValue || !_practiceBankIid.HasValue)
             {
                 MessageBox.Show("Thông tin ôn luyện chưa được tải đầy đủ. Vui lòng thử lại sau giây lát.", "Thông báo");
                 return;
             }
- 
-            var confirm = MessageBox.Show("Hệ thống sẽ tự động quét toàn bộ ngân hàng câu hỏi, lấy đáp án đúng (is_answer: 1) và nộp bài hàng loạt. Tiếp tục?", "Xác nhận Auto", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-            if (confirm != DialogResult.Yes) return;
- 
+
             try
             {
                 this.Cursor = Cursors.WaitCursor;
-                AppLog.Info($"[Auto Ôn luyện] Bắt đầu quét ngân hàng câu hỏi cho khóa học [{_course.Name}]...");
 
-                // Lấy lại ri/rit tươi nhất nếu có thể (lấy từ thông tin chi tiết đã lưu hoặc fetch lại)
+                // 1. Lấy dữ liệu chi tiết bài tập & ngân hàng câu hỏi
                 var practiceDetail = await _courseService.GetPracticeDetailAsync(_practiceIid, _course.Iid);
-                string ri = practiceDetail?.SelectToken("result._expand.exam_sco.ri")?.ToString();
-                string rit = practiceDetail?.SelectToken("result._expand.exam_sco.rit")?.ToString();
+                var bankResponse = await _courseService.GetQuestionBankStatusAsync(
+                    _practiceExamScoIid.Value, _practiceBankIid.Value, _course.Iid);
 
-                var response = await _courseService.GetQuestionBankStatusAsync(_practiceExamScoIid.Value, _practiceBankIid.Value, _course.Iid);
-                if (response != null && response["result"]?["questions"]?["result"] is JArray qArray)
-                {
-                    var questions = qArray.Children().ToList();
-                    if (questions.Count == 0)
-                    {
-                        MessageBox.Show("Ngân hàng câu hỏi trống hoặc đã được giải hết.", "Thông báo");
-                        return;
-                    }
-
-                    // Log đáp án đúng trước khi nộp
-                    int userIid = _courseService.AuthService?.CurrentUserIid ?? 0;
-                    foreach (var q in questions)
-                    {
-                        string qContent = q["content"]?.ToString() ?? "Không rõ nội dung";
-                        string qIidStr = q["iid"]?.ToString() ?? "0";
-                        
-                        // Tìm câu trả lời đúng (is_answer: 1) trong mc_answers hoặc answers2
-                        var options = (q["mc_answers"] as JArray) ?? (q["answers2"] as JArray);
-                        string rightAnsText = "Không tìm thấy is_answer:1";
-                        if (options != null)
-                        {
-                            var correct = options.FirstOrDefault(a => a["is_answer"]?.ToString() == "1");
-                            if (correct != null) rightAnsText = correct["text"]?.ToString() ?? "Unknown";
-                        }
-                        
-                        AppLog.Info($"[Giải câu hỏi] ID {qIidStr}: {qContent} => Đáp án chuẩn: {rightAnsText}", 0, userIid);
-                    }
-
-                    AppLog.Info($"[Auto Ôn luyện] Đã thu thập {questions.Count} câu hỏi. Đang gọi API save-take nộp hàng loạt...", 0, userIid);
-
-                    var saveRes = await _courseService.SavePracticeTakeAsync(_practiceIid, _practiceExamScoIid.Value, _course.Iid, questions, ri, rit);
-                    
-                    if (saveRes != null && (bool)saveRes["success"])
-                    {
-                        MessageBox.Show($"Thành công: Đã giải và nộp {questions.Count} câu hỏi ôn luyện!", "Thông báo");
-                        await LoadPracticeStatsAsync(); // Refresh with new stats
-                    }
-                    else
-                    {
-                        string errMsg = saveRes?["message"]?.ToString() ?? "Lỗi không xác định từ máy chủ.";
-                        MessageBox.Show($"Cảnh báo: Phản hồi từ server có thể không thành công. Lỗi: {errMsg}", "Thông báo");
-                    }
-                }
-                else
+                if (bankResponse == null || !(bankResponse["result"]?["questions"]?["result"] is JArray qArray))
                 {
                     MessageBox.Show("Không thể lấy dữ liệu ngân hàng câu hỏi.", "Lỗi");
+                    return;
                 }
+
+                var questions = qArray.Children().ToList();
+                if (questions.Count == 0)
+                {
+                    MessageBox.Show("Ngân hàng câu hỏi trống.", "Thông báo");
+                    return;
+                }
+
+                // 2. Tìm ri và rit chính xác từ các phản hồi JSON
+                string ri = practiceDetail?.SelectToken("$..ri")?.ToString()
+                         ?? bankResponse?.SelectToken("$..ri")?.ToString()
+                         ?? "";
+                string rit = practiceDetail?.SelectToken("$..rit")?.ToString()
+                          ?? bankResponse?.SelectToken("$..rit")?.ToString()
+                          ?? "";
+
+                // 3. Lấy take_id từ sync progress
+                string takeId = "";
+                var syncProgress = await _courseService.GetSyncPracticeProgressAsync(
+                    _practiceIid, _practiceExamScoIid.Value, _course.Iid, ri, rit);
+                if (syncProgress != null)
+                {
+                    takeId = syncProgress["result"]?["take_id"]?.ToString()
+                          ?? syncProgress["result"]?["id"]?.ToString()
+                          ?? "";
+                    if (string.IsNullOrEmpty(ri)) ri = syncProgress.SelectToken("$..ri")?.ToString() ?? "";
+                    if (string.IsNullOrEmpty(rit)) rit = syncProgress.SelectToken("$..rit")?.ToString() ?? "";
+                }
+
+                // 4. Lấy question_category
+                string questionCategory =
+                    bankResponse["result"]?["questions"]?["question_category"]?.ToString()
+                    ?? bankResponse["result"]?["question_category"]?.ToString()
+                    ?? questions[0]["question_category"]?.ToString()
+                    ?? questions[0]["category"]?.ToString()
+                    ?? "";
+
+                int userIid = _courseService.AuthService?.CurrentUserIid ?? 0;
+                AppLog.Info(
+                    $"[Auto Ôn luyện] Tổng {questions.Count} câu | category='{questionCategory}' | takeId='{takeId}'",
+                    0, userIid);
+
+                // 5. Mở popup AutoPracticeForm — xử lý batch 5 câu/lần, cập nhật KPI realtime
+                this.Cursor = Cursors.Default;
+                using var popup = new LotusLMSClient.Forms.AutoPracticeForm(
+                    _course,
+                    _courseService,
+                    questions,
+                    _practiceIid,
+                    _practiceExamScoIid.Value,
+                    ri,
+                    rit,
+                    takeId,
+                    questionCategory);
+                popup.ShowDialog(this.FindForm());
+
+                // 6. Làm mới thống kê sau khi popup đóng
+                await LoadPracticeStatsAsync();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi trong quá trình Auto: {ex.Message}", "Lỗi");
+                MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi");
             }
             finally
             {

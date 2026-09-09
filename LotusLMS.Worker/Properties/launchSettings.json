@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "LotusLMS.Worker": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "Worker__Mode": "AutoStudy",
+        "Worker__AutoStudy__Interval": "00:00:10",
+        "Worker__AutoStudy__MaxDegreeOfParallelism": "1",
+        "Worker__AutoStudy__MaxRetryCount": "3",
+        "Worker__AutoStudy__RetryDelay": "00:00:10"
+      }
+    }
+  }
+}

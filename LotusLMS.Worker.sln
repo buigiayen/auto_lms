@@ -1,0 +1,33 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.32014.148
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LotusLMS.Http", "LotusLMS.Http\LotusLMS.Http.csproj", "{A1D8E29C-43EC-4EAF-BE23-16FF4B5C7A10}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LotusLMS.Api", "LotusLMS.Api\LotusLMS.Api.csproj", "{E7CE9F4B-4698-4D03-AFC4-A4B6DFCE2120}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LotusLMS.Worker", "LotusLMS.Worker\LotusLMS.Worker.csproj", "{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A1D8E29C-43EC-4EAF-BE23-16FF4B5C7A10}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1D8E29C-43EC-4EAF-BE23-16FF4B5C7A10}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1D8E29C-43EC-4EAF-BE23-16FF4B5C7A10}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1D8E29C-43EC-4EAF-BE23-16FF4B5C7A10}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E7CE9F4B-4698-4D03-AFC4-A4B6DFCE2120}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E7CE9F4B-4698-4D03-AFC4-A4B6DFCE2120}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E7CE9F4B-4698-4D03-AFC4-A4B6DFCE2120}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E7CE9F4B-4698-4D03-AFC4-A4B6DFCE2120}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,41 @@
+services:
+  lotuslms-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: lotuslms-worker:latest
+    container_name: lotuslms-worker
+    restart: "no"
+    environment:
+      # Worker mode: ReadOnlyProbe (safe) | AutoStudy (real writes) | Idle
+      Worker__Mode: ${WORKER_MODE:-ReadOnlyProbe}
+
+      # Account (required)
+      LotusLmsCredentials__Username: ${LOTUSLMS_USERNAME:-}
+      LotusLmsCredentials__Password: ${LOTUSLMS_PASSWORD:-}
+
+      # Request context (matches the web client)
+      LotusLmsCredentials__ClientSyncToken: ${LOTUSLMS_CLIENT_SYNC_TOKEN:-}
+      LotusLmsCredentials__RequestId: ${LOTUSLMS_REQUEST_ID:-}
+      LotusLmsCredentials__RequestToken: ${LOTUSLMS_REQUEST_TOKEN:-}
+      LotusLmsCredentials__StudentRequestId: ${LOTUSLMS_STUDENT_REQUEST_ID:-}
+      LotusLmsCredentials__StudentRequestToken: ${LOTUSLMS_STUDENT_REQUEST_TOKEN:-}
+
+      # Fixed device/session identity (avoids token_invalid on long runs)
+      LotusLmsCredentials__DeviceUuid: ${LOTUSLMS_DEVICE_UUID:-}
+      LotusLmsCredentials__SessionId: ${LOTUSLMS_SESSION_ID:-}
+
+      # One JSONL response file per API URI path.
+      LotusLms__LogApiResponses: ${LOG_API_RESPONSES:-true}
+      LotusLms__ApiResponseLogDirectory: ${API_RESPONSE_LOG_DIRECTORY:-logs/api-responses}
+
+      # Proxy (disabled by default)
+      Http__Proxy__Enabled: ${PROXY_ENABLED:-false}
+      Http__Proxy__Address: ${PROXY_ADDRESS:-}
+      Http__Proxy__Username: ${PROXY_USERNAME:-}
+      Http__Proxy__Password: ${PROXY_PASSWORD:-}
+      Http__Proxy__Domain: ${PROXY_DOMAIN:-}
+      Http__Proxy__BypassOnLocal: ${PROXY_BYPASS_ON_LOCAL:-true}
+      Http__Proxy__UseDefaultCredentials: ${PROXY_USE_DEFAULT_CREDENTIALS:-false}
+    volumes:
+      - ./logs/api-responses:/app/logs/api-responses

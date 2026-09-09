@@ -85,6 +85,11 @@ StyleCopReport.xml
 *.tmp
 *.tmp_proj
 *.log
+**/logs/api-responses/
+
+# Environment files (contains secrets — do NOT commit)
+.env
+
 *.vspscc
 *.vssscc
 .builds

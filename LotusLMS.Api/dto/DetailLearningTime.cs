@@ -10,7 +10,7 @@ public sealed class ResultDetailLearningTime
     public string? Ntype { get; set; }
     public int MinLearningTime { get; set; }
     public List<LearningTimeNode> Children { get; set; } = [];
-    public int ActualLearningTime => Children.Sum(c => c.TotalActualLearningTime);
+    public double ActualLearningTime => Children.Sum(c => c.TotalActualLearningTime);
     public bool IsSuccess => ActualLearningTime >= MinLearningTime;
 }
 
@@ -22,11 +22,11 @@ public sealed class LearningTimeNode
     public string? Name { get; set; }
     public List<LearningTimeNode> Children { get; set; } = [];
     public int MinLearningTime { get; set; }
-    public int ActualLearningTime { get; set; }
+    public double ActualLearningTime { get; set; }
     public bool IsLeaf => Children.Count == 0;
 
     // Sum leaf times recursively to avoid counting parent aggregates twice.
-    public int TotalActualLearningTime => IsLeaf
+    public double TotalActualLearningTime => IsLeaf
         ? ActualLearningTime
         : Children.Sum(c => c.TotalActualLearningTime);
 

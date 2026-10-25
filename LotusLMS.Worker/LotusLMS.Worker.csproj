@@ -9,10 +9,12 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <InternalsVisibleTo Include="LotusLMS.RequestSigning.Tests" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\LotusLMS.Api\LotusLMS.Api.csproj" />
+    <ProjectReference Include="..\LotusLMS.Client\LotusLMS.Client.csproj" />
     <ProjectReference Include="..\LotusLMS.Http\LotusLMS.Http.csproj" />
   </ItemGroup>
 

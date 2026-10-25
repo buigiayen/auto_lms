@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#153e35"><title>Lotus · Quản lý tài khoản</title>
+  <link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script>
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6m2 4a5 5 0 0 1 3 4v2"/></symbol>
+    <symbol id="i-log" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+    <symbol id="i-network" viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M5 16v-4h14v4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 12-2l1.9 3M4 16l1.9 3a7 7 0 0 0 12-2"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="m15 5 4 4M4 20l5-1L20 8a2.8 2.8 0 0 0-4-4L5 15l-1 5Z"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.1M7 17.5h.1M12 6.5h5M12 17.5h5"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 3 8 4v5c0 5-8 9-8 9s-8-4-8-9V7l8-4Z"/><path d="m8 12 3 3 5-6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
+  </svg>
+  <aside class="sidebar">
+    <a class="brand" href="#accounts" aria-label="Lotus Client"><span class="brand-mark">✳</span><span>lotus<span class="brand-caption">WORKER CONSOLE</span></span></a>
+    <div class="workspace"><span class="workspace-icon">L</span><div>Không gian local<small>Cá nhân · SQLite</small></div><span class="workspace-dot"></span></div>
+    <div class="nav-caption">QUẢN LÝ</div>
+    <nav aria-label="Điều hướng chính">
+      <a href="#accounts" class="nav-link active" data-nav="accounts"><svg><use href="#i-users"/></svg>Tài khoản<span class="nav-count" id="nav-count">0</span></a>
+      <a href="#logs" class="nav-link" data-nav="logs"><svg><use href="#i-log"/></svg>Nhật ký worker</a>
+      <a href="#proxy" class="nav-link" data-nav="proxy"><svg><use href="#i-network"/></svg>Cấu hình proxy</a>
+    </nav>
+    <div class="sidebar-bottom"><div class="local-note"><svg><use href="#i-shield"/></svg><span>Dữ liệu trên máy bạn<small>Tài khoản được mã hóa khi lưu</small></span></div><div class="sidebar-foot"><span class="status-dot"></span> LOCAL INSTANCE<span>v1.0</span></div></div>
+  </aside>
+  <main>
+    <header class="topbar"><div class="breadcrumb">Không gian làm việc <span>/</span> <strong id="breadcrumb">Tài khoản</strong></div><div class="topbar-right"><span class="connection" id="connection"><span class="status-dot"></span>Đang kết nối</span><span class="avatar">LC</span></div></header>
+    <div class="main-content">
+      <section id="accounts-page" class="page">
+        <div class="page-heading"><div><div class="eyebrow">KHÔNG GIAN VẬN HÀNH <span>01</span></div><h1>Quản lý tài khoản</h1><p>Một nơi để theo dõi tài khoản, worker và hoạt động học tập.</p></div><button class="button primary" id="add-account"><svg><use href="#i-plus"/></svg>Thêm tài khoản</button></div>
+        <div class="summary-grid">
+          <article class="summary"><span class="summary-icon"><svg><use href="#i-users"/></svg></span><span>Tổng tài khoản</span><strong id="stat-total">0</strong><small>Trong không gian của bạn</small></article>
+          <article class="summary"><span class="summary-icon green"><svg><use href="#i-play"/></svg></span><span>Đang treo</span><strong id="stat-running">0</strong><small><span class="status-dot"></span> Trạng thái được yêu cầu</small></article>
+          <article class="summary"><span class="summary-icon amber"><svg><use href="#i-pause"/></svg></span><span>Dừng treo</span><strong id="stat-stopped">0</strong><small>Sẵn sàng khi bạn cần</small></article>
+          <article class="summary"><span class="summary-icon"><svg><use href="#i-server"/></svg></span><span>Worker đang nhận việc</span><strong id="stat-workers">0</strong><small>Tiến trình đã tiếp nhận học viên</small></article>
+        </div>
+        <section class="panel account-panel" aria-label="Danh sách tài khoản">
+          <div class="panel-heading"><div><h2>Danh sách tài khoản <span class="count-pill" id="account-count">0</span></h2><p>Quản lý thông tin và mở chi tiết từng tài khoản.</p></div><button class="button subtle" id="refresh-accounts"><svg><use href="#i-refresh"/></svg>Làm mới</button></div>
+          <div class="filters"><label class="search-box"><svg><use href="#i-search"/></svg><input id="account-search" placeholder="Tìm căn cước hoặc tên worker…" aria-label="Tìm kiếm tài khoản"></label><select id="provider-filter" aria-label="Lọc nhà cung cấp"><option value="">Tất cả nhà cung cấp</option><option value="yenthuy">Yên Thủy</option><option value="truongson">Trường Sơn</option></select><select id="status-filter" aria-label="Lọc trạng thái"><option value="">Tất cả trạng thái</option><option value="running">Treo</option><option value="stopped">Dừng treo</option></select></div>
+          <div id="accounts-error" class="inline-error" role="alert" hidden></div>
+          <p class="table-hint">Vuốt ngang để xem đầy đủ thông tin và thao tác.</p><div class="table-scroll"><table><thead><tr><th>TÀI KHOẢN</th><th>NHÀ CUNG CẤP</th><th>GIÁO VIÊN QUẢN LÝ</th><th>WORKER</th><th>PROXY</th><th>TRẠNG THÁI</th><th>CẬP NHẬT</th><th class="right">THAO TÁC</th></tr></thead><tbody id="account-rows"><tr><td colspan="8" class="table-loading">Đang tải tài khoản…</td></tr></tbody></table></div>
+          <div class="pagination"><span id="accounts-range">0 tài khoản</span><div><button class="button small" id="accounts-prev" aria-label="Trang trước">←</button><span id="accounts-page-label">Trang 1</span><button class="button small" id="accounts-next" aria-label="Trang sau">→</button></div></div>
+        </section>
+        <div class="bottom-note"><svg><use href="#i-shield"/></svg>Mật khẩu được mã hóa và chỉ được sử dụng ở backend.<span id="updated-label"></span></div>
+      </section>
+
+      <section id="logs-page" class="page" hidden>
+        <div class="page-heading"><div><div class="eyebrow">DÒNG HOẠT ĐỘNG <span>02</span></div><h1>Nhật ký worker</h1><p>Theo dõi các sự kiện được worker gửi về không gian local.</p></div><button class="button" id="refresh-logs"><svg><use href="#i-refresh"/></svg>Làm mới</button></div>
+        <section class="panel"><div class="panel-heading"><div><h2>Sự kiện gần đây</h2><p>Tự cập nhật mỗi 5 giây khi bạn đang xem.</p></div><span class="live-badge"><span class="status-dot"></span>Đang theo dõi</span></div><div class="filters"><select id="log-level" aria-label="Cấp độ log"><option value="">Tất cả cấp độ</option><option value="debug">Debug</option><option value="info">Info</option><option value="warn">Warning</option><option value="error">Error</option></select><label class="date-filter">Từ thời điểm<input type="datetime-local" id="log-from"></label><label class="date-filter">Đến thời điểm<input type="datetime-local" id="log-to"></label></div><div id="logs-content"></div><div class="pagination"><span id="logs-range"></span><div><button class="button small" id="logs-prev">←</button><span id="logs-page-label">Trang 1</span><button class="button small" id="logs-next">→</button></div></div></section>
+      </section>
+
+      <section id="proxy-page" class="page" hidden>
+        <div class="page-heading"><div><div class="eyebrow">KẾT NỐI <span>03</span></div><h1>Cấu hình proxy</h1><p>Lưu nhiều cấu hình và chọn một proxy riêng cho mỗi tài khoản.</p></div><span class="badge" id="proxy-badge">Chưa tải</span></div>
+        <div class="settings-grid"><form class="panel proxy-form" id="proxy-form"><div class="panel-heading"><div><h2 id="proxy-editor-title">Thêm cấu hình proxy</h2><p>Chọn cấu hình này trong form tạo hoặc sửa tài khoản.</p></div><label class="switch"><input type="checkbox" id="proxy-enabled" aria-label="Bật proxy"><span></span></label></div><div class="form-body"><label class="proxy-name-field">Tên cấu hình<input id="proxy-name" required maxlength="100" placeholder="Ví dụ: Proxy Trường Sơn 01" autocomplete="off"></label><div class="field-row proxy-address"><label>Giao thức<select id="proxy-protocol"><option value="http">HTTP</option><option value="https">HTTPS</option></select></label><label>Host<input id="proxy-host" placeholder="proxy.example" autocomplete="off"></label><label>Port<input id="proxy-port" placeholder="29087" inputmode="numeric" type="number" min="1" max="65535"></label></div><div class="field-row"><label>Username<input id="proxy-username" placeholder="Tên đăng nhập proxy" autocomplete="off"></label><label>Password<input id="proxy-password" type="password" placeholder="Để trống để giữ mật khẩu" autocomplete="new-password"></label></div><label class="proxy-expiry-field">Ngày hết hạn proxy xoay<input id="proxy-expires-on" type="date" min="1000-01-01" max="9999-12-31"><span class="field-help">Có hiệu lực đến hết ngày theo giờ Việt Nam. Để trống nếu chưa đặt hạn.</span></label><label class="checkbox-label"><input id="proxy-clear" type="checkbox">Xóa mật khẩu đang lưu</label><p class="field-help">Hỗ trợ HTTP/HTTPS. Không cần tài khoản nếu proxy xác thực bằng IP.</p><div id="proxy-error" class="inline-error" role="alert" hidden></div><div id="proxy-result" class="test-result" role="status" hidden></div></div><div class="form-footer"><button type="button" class="button" id="test-proxy"><svg><use href="#i-network"/></svg>Kiểm tra kết nối</button><button type="submit" class="button primary"><svg><use href="#i-check"/></svg>Lưu cấu hình</button></div></form>
+        <aside class="proxy-catalog panel"><div class="panel-heading"><div><h2>Cấu hình đã lưu</h2><p>Mỗi tài khoản chọn một cấu hình.</p></div><button class="button small" id="new-proxy" type="button" aria-label="Thêm cấu hình proxy"><svg><use href="#i-plus"/></svg>Thêm</button></div><div id="proxy-list"></div><div class="proxy-catalog-note">Đổi proxy trong form “Sửa tài khoản”. Proxy đang được sử dụng cần được gỡ khỏi tài khoản trước khi xóa.</div></aside></div>
+      </section>
+    </div>
+    <footer class="page-footer"><span>LOTUS CLIENT</span><span>Không gian quản lý của bạn.</span></footer>
+  </main>
+  <dialog id="dialog" aria-labelledby="dialog-title"></dialog>
+  <div class="toast-region" id="toasts" aria-live="polite"></div>
+</body>
+</html>

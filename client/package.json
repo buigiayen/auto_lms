@@ -1,0 +1,16 @@
+{
+  "name": "lotuslms-client",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.0.0" },
+  "scripts": {
+    "start": "node src/server/index.js",
+    "dev": "node --watch src/server/index.js",
+    "test": "node --test tests/*.test.js",
+    "test:worker": "node tests/worker-smoke.mjs",
+    "test:worker-v2": "node tests/worker-v2-smoke.mjs",
+    "check": "node scripts/check.js"
+  },
+  "dependencies": { "undici": "8.12.3" }
+}

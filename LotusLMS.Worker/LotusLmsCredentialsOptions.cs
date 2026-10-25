@@ -19,9 +19,8 @@ public sealed class LotusLmsCredentialsOptions
     public string? ClientSyncToken { get; init; }
 
     /// <summary>
-    /// Optional fixed device id. When omitted, the API library generates a new GUID
-    /// for each login. Set it to the web client's fixed value when the tenant binds
-    /// sessions to the device id.
+    /// Optional fixed device id. When omitted, the API library generates a GUID
+    /// once and reuses it from the local device identity file.
     /// </summary>
     public string? DeviceUuid { get; init; }
 

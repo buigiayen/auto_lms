@@ -1,0 +1,137 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { Worker } from 'node:worker_threads';
+import { randomUUID } from 'node:crypto';
+import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { DatabaseSync } from 'node:sqlite';
+import { Store } from '../src/server/store.js';
+import { createApp } from '../src/server/app.js';
+const temp = () => mkdtempSync(join(tmpdir(), 'lotus-queue-'));
+const accountInput = { identityNumber: '000000000001', password: 'fixture-secret', provider: 'truongson', workerName: 'preferred', status: 'running' };
+const claimInput = workerName => ({ workerName, instanceId: randomUUID(), requestId: randomUUID() });
+const ownership = run => ({ runId: run.runId, instanceId: run.instanceId, leaseToken: run.leaseToken });
+
+test('atomic claims from independent SQLite connections prevent duplicate students and survive restarts', async () => {
+  const directory = temp(); let store = new Store(directory);
+  const children = [];
+  try {
+    const account = store.saveAccount(accountInput);
+    const spawn = async name => {
+      const worker = new Worker(`const { parentPort, workerData } = require('node:worker_threads');
+        (async()=> { const { Store } = await import(workerData.url); const store = new Store(workerData.directory);
+          parentPort.postMessage({ready:true}); parentPort.once('message',()=> {try {
+            const result=store.queue.claim(workerData.accountId,workerData.name,workerData.input);
+            parentPort.postMessage({ok:true,runId:result.runId});
+          }catch(e){parentPort.postMessage({ok:false,code:e.code});}finally{store.close();}}); })();`,
+      { eval: true, workerData: { url: new URL('../src/server/store.js', import.meta.url).href, directory, accountId: account.id, name, input: claimInput(name) } });
+      children.push(worker);
+      await new Promise((resolve, reject) => { worker.once('message', resolve); worker.once('error', reject); });
+      return worker;
+    };
+    const a = await spawn('worker-a'), b = await spawn('worker-b');
+    const wait = worker => new Promise((resolve,reject) => { worker.once('message',resolve); worker.once('error',reject); });
+    const results = [wait(a),wait(b)]; a.postMessage('claim'); b.postMessage('claim');
+    const received = await Promise.all(results);
+    assert.equal(received.filter(r => r.ok).length, 1);
+    assert.equal(received.find(r => !r.ok).code, 'ACCOUNT_CLAIMED');
+    assert.equal(store.db.prepare("SELECT count(*) n FROM worker_runs WHERE state='accepted'").get().n, 1);
+    const id = received.find(r => r.ok).runId;
+    store.close(); store = new Store(directory);
+    assert.equal(store.queue.active(account.id).id, id);
+    assert.equal(store.queue.available(new URLSearchParams(), { page: 1, pageSize: 20, offset: 0 }).data.length, 0);
+  } finally { await Promise.all(children.map(w => w.terminate())); store.close(); rmSync(directory,{recursive:true}); }
+});
+
+test('queue API enforces ownership, heartbeat expiry, stop/restart, per-run logs and credential isolation', async () => {
+  const directory = temp(); let time = Date.parse('2040-01-01T00:00:00Z');
+  const app = createApp({ directory, clock: () => time });
+  await new Promise(resolve => app.server.listen(0,'127.0.0.1',resolve));
+  const origin = `http://127.0.0.1:${app.server.address().port}`;
+  const call = async (path, method='GET', body, workerName) => {
+    const r = await fetch(origin+path,{method,headers:{...(workerName?{Authorization:`Bearer ${app.store.workerKeys[workerName]}`} : {}),...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
+    return {status:r.status,...(r.status===204?{}:await r.json())};
+  };
+  try {
+    const registered = await call('/api/workers','POST',{workerName:'worker-a'});
+    assert.equal(registered.status,201); assert.equal(registered.data.apiKey,app.store.workerKeys['worker-a']);
+    assert.equal((await call('/api/workers','POST',{workerName:'worker-a'})).status,409);
+    await call('/api/workers','POST',{workerName:'worker-b'});
+    const account = app.store.saveAccount(accountInput);
+    const second = app.store.saveAccount({...accountInput,identityNumber:'000000000002',status:'stopped'});
+    const proxy = app.store.saveProxy({name:'Will expire',enabled:true,address:'http://proxy.example:29087',expiresOn:'2039-12-31'});
+    // Represent an existing account whose assigned profile has since expired.
+    app.store.db.prepare('UPDATE accounts SET proxy_id=? WHERE id=?').run(proxy.id,second.id);
+    app.store.db.prepare("UPDATE accounts SET status='running' WHERE id=?").run(second.id);
+    assert.equal((await call('/api/worker/accounts')).status,401);
+    const available = await call('/api/worker/accounts','GET',undefined,'worker-a');
+    assert.deepEqual(available.data.map(a=>a.id),[account.id]);
+    assert.ok(!JSON.stringify(available).includes('fixture-secret'));
+    const input = claimInput('worker-a');
+    const claim = await call(`/api/worker/accounts/${account.id}/claim`,'POST',input,'worker-a');
+    assert.equal(claim.status,200); const run = claim.data;
+    assert.equal(run.credentials.password,accountInput.password); assert.equal(run.provider,account.provider);
+    assert.equal(run.lms.tenant,account.provider); assert.equal(run.workerName,'worker-a');
+    assert.equal((await call(`/api/worker/accounts/${account.id}/claim`,'POST',input,'worker-a')).data.runId,run.runId);
+    assert.equal((await call(`/api/worker/accounts/${account.id}/claim`,'POST',input,'worker-a')).data.leaseToken,run.leaseToken);
+    assert.equal((await call(`/api/worker/accounts/${account.id}/claim`,'POST',claimInput('worker-b'),'worker-b')).error.code,'ACCOUNT_CLAIMED');
+    assert.equal((await call('/api/worker/accounts','GET',undefined,'worker-b')).data.length,0);
+    assert.equal((await call(`/api/accounts/${account.id}`,'PATCH',{password:'changed'})).error.code,'ACCOUNT_BUSY');
+    const event = {...ownership(run),accountId:account.id,workerName:'worker-a',eventId:randomUUID(),level:'info',message:'Đang xử lý học phần 22',occurredAt:new Date(time).toISOString(),context:{courseIid:22}};
+    assert.equal((await call('/api/worker/logs','POST',{...event,leaseToken:'wrong'},'worker-a')).status,403);
+    assert.equal((await call('/api/worker/logs','POST',event,'worker-b')).status,403);
+    assert.equal((await call('/api/worker/logs','POST',event,'worker-a')).status,201);
+    assert.equal((await call('/api/worker/logs','POST',event,'worker-a')).data.duplicate,true);
+    assert.equal((await call(`/api/accounts/${account.id}`)).data.execution.lastLog.message,event.message);
+    const publicInfo = JSON.stringify(await call(`/api/accounts/${account.id}`));
+    assert.ok(!publicInfo.includes(run.leaseToken)); assert.ok(!publicInfo.includes(accountInput.password));
+    time+=10000;
+    assert.equal((await call(`/api/worker/accounts/${account.id}/heartbeat`,'POST',ownership(run),'worker-b')).status,403);
+    const heartbeat = await call(`/api/worker/accounts/${account.id}/heartbeat`,'POST',ownership(run),'worker-a');
+    assert.equal(heartbeat.data.state,'running'); assert.equal(Date.parse(heartbeat.data.leaseExpiresAt),time+30000);
+    await call(`/api/accounts/${account.id}/status`,'PATCH',{status:'stopped'});
+    await call(`/api/accounts/${account.id}/status`,'PATCH',{status:'running'});
+    assert.equal((await call('/api/worker/accounts','GET',undefined,'worker-b')).data.length,0,'quick stop/run must keep the existing lease until stop acknowledgement');
+    assert.equal((await call(`/api/worker/accounts/${account.id}/heartbeat`,'POST',ownership(run),'worker-a')).data.status,'stopped');
+    const finish={...ownership(run),outcome:'stopped'};
+    assert.equal((await call(`/api/worker/accounts/${account.id}/finish`,'POST',finish,'worker-a')).data.state,'stopped');
+    assert.equal((await call(`/api/worker/accounts/${account.id}/finish`,'POST',finish,'worker-a')).status,200);
+    assert.equal((await call(`/api/accounts/${account.id}`)).data.execution.state,'queued');
+    const next=(await call(`/api/worker/accounts/${account.id}/claim`,'POST',claimInput('worker-b'),'worker-b')).data;
+    assert.notEqual(next.runId,run.runId);
+    assert.equal((await call(`/api/worker/accounts/${account.id}/heartbeat`,'POST',ownership(run),'worker-a')).error.code,'LEASE_LOST');
+    assert.equal((await call(`/api/worker/accounts/${account.id}/finish`,'POST',{...ownership(run),outcome:'failed'},'worker-a')).status,409);
+    assert.equal((await call(`/api/accounts/${account.id}`)).data.execution.runId,next.runId);
+    // Late logs retain the original run and cannot masquerade as activity for the new owner.
+    assert.equal((await call('/api/worker/logs','POST',{...event,eventId:randomUUID(),message:'Late old log'},'worker-a')).status,201);
+    assert.ok((await call(`/api/accounts/${account.id}`)).data.execution.lastLog.message.includes('worker-b'));
+    time+=30000;
+    assert.equal((await call(`/api/worker/accounts/${account.id}/heartbeat`,'POST',ownership(next),'worker-b')).error.code,'LEASE_LOST');
+    assert.equal((await call('/api/worker/accounts','GET',undefined,'worker-a')).data[0].id,account.id);
+    const reclaim=(await call(`/api/worker/accounts/${account.id}/claim`,'POST',claimInput('worker-a'),'worker-a')).data;
+    assert.notEqual(reclaim.runId,next.runId);
+    assert.equal((await call(`/api/worker/accounts/${account.id}/finish`,'POST',{...ownership(next),outcome:'completed'},'worker-b')).error.code,'LEASE_LOST');
+    assert.equal((await call(`/api/accounts/${account.id}`)).data.execution.runId,reclaim.runId);
+    assert.equal((await call(`/api/worker/accounts/${account.id}/finish`,'POST',{...ownership(reclaim),outcome:'completed'},'worker-a')).data.state,'completed');
+    assert.equal(app.store.account(account.id).status,'stopped');
+    time+=300001;
+    assert.equal((await call('/api/worker/logs','POST',{...event,eventId:randomUUID()},'worker-a')).error.code,'RUN_LOG_WINDOW_CLOSED');
+  } finally {await app.close();rmSync(directory,{recursive:true});}
+});
+
+test('schema upgrade preserves old accounts and logs and backs up before adding run IDs', () => {
+  const directory=temp();let store=new Store(directory);
+  try{
+    const account=store.saveAccount(accountInput);
+    store.addLog({accountId:account.id,workerName:account.workerName,eventId:randomUUID(),level:'info',message:'Legacy log',occurredAt:new Date().toISOString()},account.workerName);
+    store.close();const db=new DatabaseSync(join(directory,'client.sqlite'));
+    db.exec('ALTER TABLE worker_logs DROP COLUMN run_id; PRAGMA user_version=3');db.close();
+    store=new Store(directory);
+    assert.ok(existsSync(join(directory,'client.before-worker-queue.sqlite')));
+    assert.equal(store.db.prepare('SELECT message FROM worker_logs').get().message,'Legacy log');
+    assert.equal(store.decrypt(store.rawAccount(account.id).password_ciphertext),accountInput.password);
+    assert.equal(store.account(account.id).execution.state,'queued');
+    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,7);
+  }finally{store.close();rmSync(directory,{recursive:true});}
+});

@@ -1,0 +1,94 @@
+using Microsoft.Extensions.Options;
+
+namespace LotusLMS.Worker.V2;
+
+public sealed class WorkerOptions
+{
+    public const string SectionName = "Worker";
+    public string WorkerName { get; set; } = "";
+    public int MaxConcurrentAccounts { get; init; } = 5;
+    public Dictionary<string, string> LaneApiKeys { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public int PollIntervalSeconds { get; init; }
+    public int HeartbeatIntervalSeconds { get; init; }
+    public int StatusIntervalSeconds { get; init; } = 60;
+
+    public int PlanPageSize { get; init; } = 12;
+
+    public int CoursePageSize { get; init; } = 20;
+
+    public int MaxPages { get; init; } = 100;
+
+    // Auto-study: seconds sent per save-item-learning-time call (client uses 15).
+    public int SaveItemSeconds { get; init; } = 15;
+
+    // Auto-study: seconds sent to track-time.
+    public int TrackTimeSeconds { get; init; } = 15;
+
+    // Auto-study: when StopOnDailyKpi is enabled, check daily KPI and send
+    // track-time every N learning-time saves (client uses 3).
+    public int KpiCheckEverySaves { get; init; } = 3;
+
+    // Auto-study: optionally stop the whole job as soon as the daily KPI is reached.
+    // Disabled by default so completed courses advance to the next course in order.
+    public bool StopOnDailyKpi { get; init; }
+
+    // Auto-study: run the practice auto-complete step as well. Practice is outside
+    // the sequential video-learning flow and is disabled by default.
+    public bool IncludePractice { get; init; }
+
+    // Practice: number of questions submitted per save-take batch (client uses 5).
+    public int PracticeBatchSize { get; init; } = 5;
+
+    // Inclusive bounds for a new random interval before every practice submission.
+    public int PracticeIntervalSeconds { get; init; } = 5;
+    public int PracticeMaxIntervalSeconds { get; init; } = 10;
+
+    // Practice: mark the last practice batch as finished. The current web client
+    // always submits finished=0, so this stays disabled by default for parity.
+    public bool MarkPracticeFinished { get; init; }
+
+    // Job scope: only process the first enrolment plan (matches the web client).
+    public bool OnlyFirstPlan { get; init; } = true;
+
+    // Job scope: only read page 1 of courses (matches the web client).
+    public bool OnlyFirstCoursePage { get; init; } = true;
+
+     internal bool IsValid() => !ValidationErrors().Any();
+
+    internal IEnumerable<string> ValidationErrors()
+    {
+        var workerNameIsValid = !string.IsNullOrWhiteSpace(WorkerName)
+            && WorkerName == WorkerName.Trim()
+            && WorkerName.Length <= 96;
+        if (!workerNameIsValid)
+            yield return "Worker:WorkerName phải dài 1–96 ký tự, không có khoảng trắng ở hai đầu.";
+        if (MaxConcurrentAccounts is < 1 or > 20)
+            yield return "Worker:MaxConcurrentAccounts phải từ 1 đến 20.";
+        else if (workerNameIsValid)
+        {
+            for (var lane = 1; lane <= MaxConcurrentAccounts; lane++)
+            {
+                var name = GetLaneWorkerName(lane);
+                if (!LaneApiKeys.TryGetValue(name, out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
+                    yield return $"Worker:LaneApiKeys:{name} cần API key đã đăng ký cho worker này.";
+            }
+        }
+        if (PollIntervalSeconds is < 1 or > 60)
+            yield return "Worker:PollIntervalSeconds phải từ 1 đến 60 giây.";
+        if (HeartbeatIntervalSeconds is < 1 or > 10)
+            yield return "Worker:HeartbeatIntervalSeconds phải từ 1 đến 10 giây.";
+    }
+
+    internal string GetLaneWorkerName(int lane) => $"{WorkerName}-{lane:00}";
+}
+
+internal sealed class WorkerOptionsValidator : IValidateOptions<WorkerOptions>
+{
+    public ValidateOptionsResult Validate(string? name, WorkerOptions options)
+    {
+        var errors = options.ValidationErrors().ToArray();
+        return errors.Length == 0
+            ? ValidateOptionsResult.Success
+            : ValidateOptionsResult.Fail(errors);
+    }
+}

@@ -4,7 +4,8 @@ public enum WorkerMode
 {
     Idle,
     ReadOnlyProbe,
-    AutoStudy
+    AutoStudy,
+    PracticeOnly
 }
 
 public sealed class WorkerOptions
@@ -39,16 +40,23 @@ public sealed class WorkerOptions
     // the sequential video-learning flow and is disabled by default.
     public bool IncludePractice { get; init; }
 
-    // Auto-study: number of questions submitted per save-take batch (client uses 5).
+    // Practice: number of questions submitted per save-take batch (client uses 5).
     public int PracticeBatchSize { get; init; } = 5;
 
-    // Auto-study: mark the last practice batch as finished. The current web client
+    // Inclusive bounds for a new random interval before every practice submission.
+    public int PracticeIntervalSeconds { get; init; } = 5;
+    public int PracticeMaxIntervalSeconds { get; init; } = 10;
+
+    // PracticeOnly: course/practice locations. Exam, bank and take IDs come from the API.
+    public PracticeTargetOptions[] PracticeTargets { get; init; } = [];
+
+    // Practice: mark the last practice batch as finished. The current web client
     // always submits finished=0, so this stays disabled by default for parity.
     public bool MarkPracticeFinished { get; init; }
 
-    // Auto-study: only process the first enrolment plan (matches the web client).
+    // Job scope: only process the first enrolment plan (matches the web client).
     public bool OnlyFirstPlan { get; init; } = true;
 
-    // Auto-study: only read page 1 of courses (matches the web client).
+    // Job scope: only read page 1 of courses (matches the web client).
     public bool OnlyFirstCoursePage { get; init; } = true;
 }

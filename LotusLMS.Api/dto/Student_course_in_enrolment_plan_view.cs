@@ -35,17 +35,36 @@ public sealed class Course
 public class _Expand
 {
     public ScoreByRubric? ScoreByRubric { get; set; }
+    public syllabus? Syllabus { get; set; }
 }
 
+public class syllabus
+{
+    public List<children> children { get; set; } = [];
+}
+public class children
+{
+    public int iid { get; set; }
+    public string name { get; set; }
+    public string ntype { get; set; } 
+}
 public class ScoreByRubric
 {
     public string? Iid { get; set; }
     public Rubric? Rubric { get; set; }
     public double? Score { get; set; }
     public bool? Passed { get; set; }
+    public ScoreByRubik[]? score_by_rubrik { get; set; }
 
 }
+public class ScoreByRubik
+{
+    public int? Iid { get; set; }
+    public string? name { get; set; }
+    public double? Score { get; set; }
+    public bool? Passed { get; set; }
 
+}
 
 public class Rubric
 {

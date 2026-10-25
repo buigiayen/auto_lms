@@ -6,11 +6,21 @@ public sealed class LotusLmsOptions
 
     public string BaseUrl { get; set; } = "https://staging-api.lotuslms.com";
 
-    public string WebOrigin { get; set; } = "https://yenthuy.huelms.com";
+    public string WebOrigin { get; set; } = "https://truongson.huelms.com";
 
-    public string Tenant { get; set; } = "yenthuy";
+    public string Tenant { get; set; } = "truongson";
 
     public int RequestTimeoutSeconds { get; set; } = 100;
+
+    /// <summary>Stores the automatically generated device UUID when no explicit UUID is supplied.</summary>
+    public string DeviceIdentityDirectory { get; set; } = ".lotuslms";
+
+    /// <summary>
+    /// Generate a fresh _sand_ri/_sand_rit pair for every request using the session's
+    /// user iid (or the guest seed on login), plus a current client-sync token for
+    /// authenticated requests. Disable only for legacy capture replay.
+    /// </summary>
+    public bool GenerateRequestTokens { get; set; } = true;
 
     public bool LogApiResponses { get; set; } = true;
 

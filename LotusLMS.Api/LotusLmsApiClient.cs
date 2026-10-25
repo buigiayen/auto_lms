@@ -25,13 +25,14 @@ public sealed class LotusLmsApiClient(
             throw new ArgumentException("Password is required.", nameof(request));
         }
 
+        var provider = ValidateProvider(request.Provider);
         var deviceUuid = string.IsNullOrWhiteSpace(request.DeviceUuid)
-            ? Guid.NewGuid().ToString()
+            ? LotusLmsDeviceIdentity.GetOrCreate(_options.DeviceIdentityDirectory)
             : request.DeviceUuid.Trim();
         var sessionId = string.IsNullOrWhiteSpace(request.SessionId)
             ? Guid.NewGuid().ToString()
             : request.SessionId.Trim();
-        var loginUrl = BuildWebUrl("user/login/?logout=1");
+        var loginUrl = BuildWebUrl("user/login/?logout=1", provider);
 
         var form = new List<KeyValuePair<string, string>>
         {
@@ -44,7 +45,7 @@ public sealed class LotusLmsApiClient(
             Pair("_sand_is_wan", "false"),
             Pair("_sand_ga_sessionToken", Empty),
             Pair("_sand_ga_browserToken", Empty),
-            Pair("_sand_domain", _options.Tenant),
+            Pair("_sand_domain", provider?.Tenant ?? _options.Tenant),
             Pair("_sand_masked", Empty),
             Pair("_sand_web_url", loginUrl),
             Pair("_sand_device_uuid", deviceUuid),
@@ -63,7 +64,8 @@ public sealed class LotusLmsApiClient(
             form,
             loginUrl,
             session: null,
-            cancellationToken);
+            cancellationToken,
+            provider);
 
         var result = root["result"] as JsonObject
             ?? throw BusinessError("user/login", "Login response does not contain a result object.", root);
@@ -94,6 +96,7 @@ public sealed class LotusLmsApiClient(
             DisplayName = displayName,
             DeviceUuid = deviceUuid,
             SessionId = sessionId,
+            Provider = provider,
             RequestId = request.RequestId,
             RequestToken = request.RequestToken,
             StudentRequestId = request.StudentRequestId,
@@ -123,7 +126,7 @@ public sealed class LotusLmsApiClient(
         return _transport.PostAsync(
             endpoint,
             BuildIdentityForm(session),
-            BuildWebUrl("student"),
+            BuildWebUrl("student", session.Provider),
             session,
             cancellationToken);
     }
@@ -153,7 +156,7 @@ public sealed class LotusLmsApiClient(
         var endpoint = BuildRelativeUri(
             "student/api/get-student-courses-in-enrolment-plan-table-view",
             query);
-        var webUrl = BuildWebUrl($"student/ep/{enrolmentPlanIid}");
+        var webUrl = BuildWebUrl($"student/ep/{enrolmentPlanIid}", session.Provider);
 
         var data = await _transport.PostAsync<BaseApi<List<Student_course_in_enrolment_plan_view>>>(
             endpoint,
@@ -189,7 +192,7 @@ public sealed class LotusLmsApiClient(
         query.AddRange(BuildBrowserQuery(session));
 
         var endpoint = BuildRelativeUri("student/api/get-detail-learning-time", query);
-        var webUrl = BuildWebUrl($"student/courses/{courseIid}");
+        var webUrl = BuildWebUrl($"student/courses/{courseIid}", session.Provider);
 
         return _transport.PostAsync(
             endpoint,
@@ -220,7 +223,7 @@ public sealed class LotusLmsApiClient(
         var endpoint = BuildRelativeUri(
             "time-tracking/course-time-tracking/get-detail-learning-time",
             query);
-        var webUrl = BuildWebUrl($"student/course/{courseIid}");
+        var webUrl = BuildWebUrl($"student/course/{courseIid}", session.Provider);
 
         var data = await _transport.PostAsync<BaseApi<ResultDetailLearningTime>>(
             endpoint,
@@ -256,7 +259,8 @@ public sealed class LotusLmsApiClient(
         }
 
         var webUrl = BuildWebUrl(
-            $"learn/course/learn/{request.CourseIid}/{request.ItemIid}");
+            $"learn/course/learn/{request.CourseIid}/{request.ItemIid}",
+            session.Provider);
         var form = BuildAuthenticatedForm(session, webUrl);
         form.InsertRange(0,
         [
@@ -290,7 +294,7 @@ public sealed class LotusLmsApiClient(
                 "Track time must be a positive finite number.");
         }
 
-        var form = BuildAuthenticatedForm(session, BuildWebUrl("student"));
+        var form = BuildAuthenticatedForm(session, BuildWebUrl("student", session.Provider));
         form.InsertRange(0,
         [
             Pair("page_id", RequireText(request.PageId, nameof(request.PageId))),
@@ -301,12 +305,12 @@ public sealed class LotusLmsApiClient(
         return _transport.PostAsync(
             "time-tracking/api/track-time",
             form,
-            BuildWebUrl("student"),
+            BuildWebUrl("student", session.Provider),
             session,
             cancellationToken);
     }
 
-    public Task<JsonObject> GetTodayKpiTimeAsync(
+    public async Task<GetToDayKpiTime> GetTodayKpiTimeAsync(
         LotusLmsSession session,
         int courseIid,
         CancellationToken cancellationToken = default)
@@ -323,14 +327,15 @@ public sealed class LotusLmsApiClient(
         var endpoint = BuildRelativeUri(
             "time-tracking/learning-time-tracking/today-gained-kpi-time",
             query);
-        var webUrl = BuildWebUrl($"learn/course/learn/{courseIid}");
+        var webUrl = BuildWebUrl($"learn/course/learn/{courseIid}", session.Provider);
 
-        return _transport.PostAsync(
+        var data = await _transport.PostAsync<BaseApi<GetToDayKpiTime>>(
             endpoint,
             BuildAuthenticatedForm(session, webUrl),
             webUrl,
             session,
             cancellationToken);
+        return data.Result;
     }
 
     public Task<JsonObject> GetCourseAsync(
@@ -353,7 +358,7 @@ public sealed class LotusLmsApiClient(
         query.AddRange(BuildBrowserQuery(session));
 
         var endpoint = BuildRelativeUri("course/api/get-course", query);
-        var webUrl = BuildWebUrl($"student/course/{courseIid}/dashboard");
+        var webUrl = BuildWebUrl($"student/course/{courseIid}/dashboard", session.Provider);
 
         return _transport.PostAsync(
             endpoint,
@@ -363,7 +368,7 @@ public sealed class LotusLmsApiClient(
             cancellationToken);
     }
 
-    public Task<JsonObject> GetPracticeDetailAsync(
+    public Task<BaseApi<GetPracticeDetail>> GetPracticeDetailAsync(
         LotusLmsSession session,
         int practiceIid,
         int courseIid,
@@ -377,14 +382,15 @@ public sealed class LotusLmsApiClient(
         {
             Pair("practice_iid", Format(practiceIid)),
             Pair("course_iid", Format(courseIid)),
-            Pair("_sand_expand[]", "exam_sco")
+            Pair("_sand_expand[]", "exam_sco"),
+            Pair("lang", "vn")
         };
         query.AddRange(BuildBrowserQuery(session));
 
         var endpoint = BuildRelativeUri("practice/api/get-practice-detail", query);
-        var webUrl = BuildWebUrl($"learn/course/learn/{courseIid}");
-
-        return _transport.PostAsync(
+        var webUrl = BuildWebUrl($"learn/course/learn/{courseIid}", session.Provider);
+        /// Debug đoạn này
+        return _transport.PostAsync<BaseApi<GetPracticeDetail>>(
             endpoint,
             BuildAuthenticatedForm(session, webUrl),
             webUrl,
@@ -392,7 +398,7 @@ public sealed class LotusLmsApiClient(
             cancellationToken);
     }
 
-    public Task<JsonObject> GetQuestionBankStatusAsync(
+    public Task<BaseApi<GetQuestionBankStatus>> GetQuestionBankStatusAsync(
         LotusLmsSession session,
         int examTemplateIid,
         int bankIid,
@@ -408,14 +414,17 @@ public sealed class LotusLmsApiClient(
         {
             Pair("bank_iids[]", Format(bankIid)),
             Pair("exam_template_iid", Format(examTemplateIid)),
-            Pair("last_ts", "0")
+            Pair("last_ts", "0"),
+            Pair("lang", "vn")
         };
         query.AddRange(BuildBrowserQuery(session));
 
         var endpoint = BuildRelativeUri("practice/api/get-question-bank-status", query);
-        return _transport.GetAsync(
+        var webUrl = BuildWebUrl($"learn/course/learn/{courseIid}", session.Provider);
+        return _transport.PostAsync<BaseApi<GetQuestionBankStatus>>(
             endpoint,
-            BuildWebUrl($"learn/course/learn/{courseIid}"),
+            BuildAuthenticatedForm(session, webUrl),
+            webUrl,
             session,
             cancellationToken);
     }
@@ -434,19 +443,90 @@ public sealed class LotusLmsApiClient(
         EnsurePositive(examScoIid, nameof(examScoIid));
         EnsurePositive(courseIid, nameof(courseIid));
 
-        var endpoint = BuildRelativeUri(
-            "practice/api/get-sync-practice-progress",
-            BuildBrowserQuery(session));
-        var webUrl = BuildWebUrl($"learn/course/learn/{courseIid}");
+        const string endpoint = "practice/api/get-sync-practice-progress";
+        var webUrl = BuildWebUrl($"learn/course/learn/{courseIid}", session.Provider);
         var form = BuildAuthenticatedForm(session, webUrl, requestId, requestToken);
         AddRequestFlags(form);
         form.InsertRange(0,
         [
             Pair("practice_iid", Format(practiceIid)),
-            Pair("exam_sco_iid", Format(examScoIid))
+            Pair("exam_sco_iid", Format(examScoIid)),
+            Pair("lang", "vn")
         ]);
 
-        return _transport.PostAsync(endpoint, form, webUrl, session, cancellationToken);
+        return _transport.PostMultipartAsync(endpoint, form, webUrl, session, cancellationToken);
+    }
+
+    public Task<JsonObject> RecalculateCoursePracticeProgressAsync(
+        LotusLmsSession session,
+        int practiceIid,
+        int courseIid,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateSession(session);
+        EnsurePositive(practiceIid, nameof(practiceIid));
+        EnsurePositive(courseIid, nameof(courseIid));
+        var webUrl = BuildWebUrl($"learn/course/learn/{courseIid}", session.Provider);
+        var form = BuildAuthenticatedForm(session, webUrl);
+        AddRequestFlags(form);
+        form.AddRange([
+            Pair("course_iid", Format(courseIid)),
+            Pair("practice_iid", Format(practiceIid)),
+            Pair("lang", "vn")
+        ]);
+        return _transport.PostMultipartAsync("practice/api/recalculate-course-practice-progress",
+            form, webUrl, session, cancellationToken);
+    }
+
+    public Task<JsonObject> StartPracticeAsync(
+        LotusLmsSession session,
+        int practiceIid,
+        int examScoIid,
+        int courseIid,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateSession(session);
+        EnsurePositive(practiceIid, nameof(practiceIid));
+        EnsurePositive(examScoIid, nameof(examScoIid));
+        EnsurePositive(courseIid, nameof(courseIid));
+        var webUrl = BuildWebUrl($"learn/course/learn/{courseIid}", session.Provider);
+        var form = BuildAuthenticatedForm(session, webUrl);
+        AddRequestFlags(form);
+        form.AddRange([
+            Pair("practice_iid", Format(practiceIid)),
+            Pair("exam_sco_iid", Format(examScoIid)),
+            Pair("course_iid", Format(courseIid)),
+            Pair("lang", "vn")
+        ]);
+        return _transport.PostMultipartAsync("practice/api/start-practice",
+            form, webUrl, session, cancellationToken);
+    }
+
+    public Task<JsonObject> TrackPracticeTimeAsync(
+        LotusLmsSession session,
+        int practiceIid,
+        int courseIid,
+        double timeSpentSeconds,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateSession(session);
+        EnsurePositive(practiceIid, nameof(practiceIid));
+        EnsurePositive(courseIid, nameof(courseIid));
+        if (!double.IsFinite(timeSpentSeconds) || timeSpentSeconds <= 0)
+            throw new ArgumentOutOfRangeException(nameof(timeSpentSeconds));
+
+        var webUrl = BuildWebUrl($"learn/course/learn/{courseIid}", session.Provider);
+        var form = BuildAuthenticatedForm(session, webUrl);
+        AddRequestFlags(form);
+        form.AddRange([
+            Pair("page_id", "practice-exam"),
+            Pair("item_id", Format(practiceIid)),
+            Pair("time_spent", timeSpentSeconds.ToString("F3", CultureInfo.InvariantCulture)),
+            Pair("metadata[user_iid]", Format(session.UserIid)),
+            Pair("lang", "vn")
+        ]);
+        return _transport.PostMultipartAsync("time-tracking/api/track-time",
+            form, webUrl, session, cancellationToken);
     }
 
     public Task<JsonObject> SavePracticeTakeAsync(
@@ -459,10 +539,8 @@ public sealed class LotusLmsApiClient(
         ValidateSession(session);
         ValidatePracticeTake(request);
 
-        var endpoint = BuildRelativeUri(
-            "practice/api/save-take",
-            BuildBrowserQuery(session));
-        var webUrl = BuildWebUrl($"learn/course/learn/{request.CourseIid}");
+        const string endpoint = "practice/api/save-take";
+        var webUrl = BuildWebUrl($"learn/course/learn/{request.CourseIid}", session.Provider);
         var form = BuildAuthenticatedForm(session, webUrl, requestId, requestToken);
         AddRequestFlags(form);
 
@@ -478,7 +556,8 @@ public sealed class LotusLmsApiClient(
             Pair("exam_sco_iid", Format(request.ExamScoIid)),
             Pair("practice_iid", Format(request.PracticeIid)),
             Pair("course_iid", Format(request.CourseIid)),
-            Pair("should_save_progress_for_course", request.SaveProgressForCourse ? "true" : "false")
+            Pair("should_save_progress_for_course", request.SaveProgressForCourse ? "true" : "false"),
+            Pair("lang", "vn")
         ]);
 
         for (var index = 0; index < request.Items.Count; index++)
@@ -504,7 +583,7 @@ public sealed class LotusLmsApiClient(
                 Format(item.ViewKeyMilliseconds)));
         }
 
-        return _transport.PostAsync(endpoint, form, webUrl, session, cancellationToken);
+        return _transport.PostMultipartAsync(endpoint, form, webUrl, session, cancellationToken);
     }
 
     private List<KeyValuePair<string, string>> BuildAuthenticatedForm(
@@ -514,7 +593,7 @@ public sealed class LotusLmsApiClient(
         string? requestTokenOverride = null)
     {
         var form = BuildIdentityForm(session);
-        form.Add(Pair("_sand_domain", _options.Tenant));
+        form.Add(Pair("_sand_domain", session.Provider?.Tenant ?? _options.Tenant));
         form.Add(Pair("_sand_web_url", webUrl));
         form.Add(Pair("_sand_device_uuid", session.DeviceUuid));
         form.Add(Pair("_sand_session_id", session.SessionId));
@@ -553,7 +632,7 @@ public sealed class LotusLmsApiClient(
         Pair("_sand_is_wan", "false"),
         Pair("_sand_ga_sessionToken", Empty),
         Pair("_sand_ga_browserToken", Empty),
-        Pair("_sand_domain", _options.Tenant),
+        Pair("_sand_domain", session.Provider?.Tenant ?? _options.Tenant),
         Pair("_sand_masked", Empty),
         Pair("_sand_session_id", session.SessionId),
         Pair("_sand_use_internal_network", "0"),
@@ -582,6 +661,7 @@ public sealed class LotusLmsApiClient(
         RequireText(session.UserId, nameof(session.UserId));
         RequireText(session.DeviceUuid, nameof(session.DeviceUuid));
         RequireText(session.SessionId, nameof(session.SessionId));
+        _ = ValidateProvider(session.Provider);
         EnsurePositive(session.UserIid, nameof(session.UserIid));
     }
 
@@ -666,11 +746,44 @@ public sealed class LotusLmsApiClient(
         }
     }
 
-    private string BuildWebUrl(string relativePath) =>
+    private string BuildWebUrl(string relativePath, LotusLmsProvider? provider = null) =>
         new Uri(
-            new Uri(_options.WebOrigin.TrimEnd('/') + "/", UriKind.Absolute),
+            new Uri((provider?.WebOrigin ?? _options.WebOrigin).TrimEnd('/') + "/", UriKind.Absolute),
             relativePath.TrimStart('/'))
         .ToString();
+
+    private static LotusLmsProvider? ValidateProvider(LotusLmsProvider? provider)
+    {
+        if (provider is null)
+        {
+            return null;
+        }
+
+        var baseUrl = RequireProviderUrl(provider.BaseUrl, nameof(provider.BaseUrl), requireOrigin: false);
+        var webOrigin = RequireProviderUrl(provider.WebOrigin, nameof(provider.WebOrigin), requireOrigin: true);
+        var tenant = RequireText(provider.Tenant, nameof(provider.Tenant));
+        return new LotusLmsProvider
+        {
+            BaseUrl = baseUrl.TrimEnd('/'),
+            WebOrigin = webOrigin.TrimEnd('/'),
+            Tenant = tenant
+        };
+    }
+
+    private static string RequireProviderUrl(string? value, string parameterName, bool requireOrigin)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || uri.Scheme is not ("http" or "https")
+            || uri.UserInfo.Length != 0
+            || uri.Query.Length != 0
+            || uri.Fragment.Length != 0
+            || (requireOrigin && uri.AbsolutePath != "/"))
+        {
+            throw new ArgumentException("Provider URLs must be absolute HTTP(S) URLs without credentials, query, or fragment.", parameterName);
+        }
+
+        return uri.ToString();
+    }
 
     private static string BuildRelativeUri(
         string path,

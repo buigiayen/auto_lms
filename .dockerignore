@@ -4,6 +4,9 @@
 
 # Secrets must never end up in the build context
 .env
+**/.lotuslms/
+client/data/
+client/node_modules/
 
 # WinForms client and web assets are not part of the worker image
 LotusLMSClient/
@@ -15,3 +18,4 @@ truongson.huelms.com/
 .gitignore
 *.md
 dotnet-install.ps1
+**/appsettings.Development.json

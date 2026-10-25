@@ -43,7 +43,7 @@ public interface ILotusLmsApiClient
         TrackTimeRequest request,
         CancellationToken cancellationToken = default);
 
-    Task<JsonObject> GetTodayKpiTimeAsync(
+    Task<GetToDayKpiTime> GetTodayKpiTimeAsync(
         LotusLmsSession session,
         int courseIid,
         CancellationToken cancellationToken = default);
@@ -53,13 +53,33 @@ public interface ILotusLmsApiClient
         int courseIid,
         CancellationToken cancellationToken = default);
 
-    Task<JsonObject> GetPracticeDetailAsync(
+    Task<BaseApi<GetPracticeDetail>> GetPracticeDetailAsync(
         LotusLmsSession session,
         int practiceIid,
         int courseIid,
         CancellationToken cancellationToken = default);
 
-    Task<JsonObject> GetQuestionBankStatusAsync(
+    Task<JsonObject> RecalculateCoursePracticeProgressAsync(
+        LotusLmsSession session,
+        int practiceIid,
+        int courseIid,
+        CancellationToken cancellationToken = default);
+
+    Task<JsonObject> StartPracticeAsync(
+        LotusLmsSession session,
+        int practiceIid,
+        int examScoIid,
+        int courseIid,
+        CancellationToken cancellationToken = default);
+
+    Task<JsonObject> TrackPracticeTimeAsync(
+        LotusLmsSession session,
+        int practiceIid,
+        int courseIid,
+        double timeSpentSeconds,
+        CancellationToken cancellationToken = default);
+
+    Task<BaseApi<GetQuestionBankStatus>> GetQuestionBankStatusAsync(
         LotusLmsSession session,
         int examTemplateIid,
         int bankIid,

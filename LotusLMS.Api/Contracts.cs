@@ -6,26 +6,31 @@ public sealed record LotusLmsLoginRequest
 
     public required string Password { get; init; }
 
+    public LotusLmsProvider? Provider { get; init; }
+
     public string? DeviceUuid { get; init; }
 
     public string? SessionId { get; init; }
 
+    /// <summary>Captured login id, used only when GenerateRequestTokens is disabled.</summary>
     public string? RequestId { get; init; }
 
+    /// <summary>Captured login token, used only when GenerateRequestTokens is disabled.</summary>
     public string? RequestToken { get; init; }
 
     /// <summary>
-    /// Post-login request context (_sand_ri) sent on student, learning-time,
-    /// and practice endpoints. Falls back to <see cref="RequestId"/> when unset.
+    /// Captured post-login _sand_ri, used only when GenerateRequestTokens is disabled.
+    /// Falls back to <see cref="RequestId"/> when unset.
     /// </summary>
     public string? StudentRequestId { get; init; }
 
     /// <summary>
-    /// Post-login request token (_sand_rit) sent on student, learning-time,
-    /// and practice endpoints. Falls back to <see cref="RequestToken"/> when unset.
+    /// Captured post-login _sand_rit, used only when GenerateRequestTokens is disabled.
+    /// Falls back to <see cref="RequestToken"/> when unset.
     /// </summary>
     public string? StudentRequestToken { get; init; }
 
+    /// <summary>Captured sync token, used only when GenerateRequestTokens is disabled.</summary>
     public string? ClientSyncToken { get; init; }
 }
 
@@ -49,6 +54,8 @@ public sealed record LotusLmsSession
 
     public required string SessionId { get; init; }
 
+    public LotusLmsProvider? Provider { get; init; }
+
     public string? RequestId { get; init; }
 
     public string? RequestToken { get; init; }
@@ -57,7 +64,17 @@ public sealed record LotusLmsSession
 
     public string? StudentRequestToken { get; init; }
 
+    /// <summary>Captured sync token, used only when GenerateRequestTokens is disabled.</summary>
     public string? ClientSyncToken { get; init; }
+}
+
+public sealed record LotusLmsProvider
+{
+    public required string BaseUrl { get; init; }
+
+    public required string WebOrigin { get; init; }
+
+    public required string Tenant { get; init; }
 }
 
 public sealed record SaveItemLearningTimeRequest

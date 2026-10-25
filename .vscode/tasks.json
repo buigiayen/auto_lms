@@ -1,0 +1,24 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build LotusLMS.Worker.V2",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/LotusLMS.Worker.V2/LotusLMS.Worker.V2.csproj",
+        "--configuration",
+        "Debug",
+        "--nologo",
+        "--disable-build-servers",
+        "-m:1"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}

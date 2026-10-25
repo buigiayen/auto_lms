@@ -16,6 +16,11 @@ internal sealed class LotusLmsOptionsValidator : IValidateOptions<LotusLmsOption
             failures.Add($"{LotusLmsOptions.SectionName}:Tenant is required.");
         }
 
+        if (string.IsNullOrWhiteSpace(options.DeviceIdentityDirectory))
+        {
+            failures.Add($"{LotusLmsOptions.SectionName}:DeviceIdentityDirectory is required.");
+        }
+
         if (options.RequestTimeoutSeconds is < 1 or > 600)
         {
             failures.Add(

@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug LotusLMS.Worker.V2",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build LotusLMS.Worker.V2",
+      "program": "${workspaceFolder}/LotusLMS.Worker.V2/bin/Debug/net10.0/LotusLMS.Worker.V2.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/LotusLMS.Worker.V2",
+      "console": "integratedTerminal",
+      "stopAtEntry": false,
+      "justMyCode": true,
+      "env": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  ]
+}

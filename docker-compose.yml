@@ -3,8 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: lotuslms-worker:latest
-    container_name: lotuslms-worker
+    image: buiyenit/lotuslms-worker:latest
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
+    container_name: ${LOTUSLMS_USERNAME}
     restart: "no"
     environment:
       # Worker mode: ReadOnlyProbe (safe) | AutoStudy (real writes) | Idle
@@ -21,7 +22,7 @@ services:
       LotusLmsCredentials__StudentRequestId: ${LOTUSLMS_STUDENT_REQUEST_ID:-}
       LotusLmsCredentials__StudentRequestToken: ${LOTUSLMS_STUDENT_REQUEST_TOKEN:-}
 
-      # Fixed device/session identity (avoids token_invalid on long runs)
+      # Optional overrides; blank uses a persisted device UUID and a fresh session ID.
       LotusLmsCredentials__DeviceUuid: ${LOTUSLMS_DEVICE_UUID:-}
       LotusLmsCredentials__SessionId: ${LOTUSLMS_SESSION_ID:-}
 
@@ -37,5 +38,8 @@ services:
       Http__Proxy__Domain: ${PROXY_DOMAIN:-}
       Http__Proxy__BypassOnLocal: ${PROXY_BYPASS_ON_LOCAL:-true}
       Http__Proxy__UseDefaultCredentials: ${PROXY_USE_DEFAULT_CREDENTIALS:-false}
+
+      Logging__LogLevel__LotusLMS.Worker.LotusLmsAutoStudy: Debug
     volumes:
       - ./logs/api-responses:/app/logs/api-responses
+      - ./.lotuslms:/app/.lotuslms

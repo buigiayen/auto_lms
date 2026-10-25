@@ -7,9 +7,9 @@ internal sealed class Worker(
     ILogger<Worker> logger,
     IOptions<WorkerOptions> options,
     IOptions<LotusLmsCredentialsOptions> credentials,
-    LotusLmsReadOnlyProbe readOnlyProbe,
-    LotusLmsAutoStudy autoStudy,
-    IHostApplicationLifetime applicationLifetime) : BackgroundService
+    IServiceProvider services,
+    IHostApplicationLifetime applicationLifetime,
+    ClientWorkerBridge? clientBridge = null) : BackgroundService
 {
     private readonly WorkerOptions _options = options.Value;
     private readonly TimeSpan _statusInterval =
@@ -17,15 +17,38 @@ internal sealed class Worker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        try
+        {
+            await ExecuteJobAsync(stoppingToken);
+            clientBridge?.SetOutcome(stoppingToken.IsCancellationRequested ? "stopped" : Environment.ExitCode == 0 ? "completed" : "failed");
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { clientBridge?.SetOutcome("stopped"); }
+        catch { clientBridge?.SetOutcome("failed"); throw; }
+        finally { applicationLifetime.StopApplication(); }
+    }
+
+    private async Task ExecuteJobAsync(CancellationToken stoppingToken)
+    {
+        if (clientBridge is not null)
+        {
+            await clientBridge.WaitForPermissionAsync(stoppingToken);
+        }
+
         if (_options.Mode == WorkerMode.ReadOnlyProbe)
         {
-            await ExecuteReadOnlyProbeAsync(credentials.Value, stoppingToken);
+            await ExecuteReadOnlyProbeAsync(clientBridge?.Credentials ?? credentials.Value, stoppingToken);
+            return;
+        }
+
+        if (_options.Mode == WorkerMode.PracticeOnly)
+        {
+            await ExecutePracticeOnlyAsync(clientBridge?.Credentials ?? credentials.Value, stoppingToken);
             return;
         }
 
         if (_options.Mode == WorkerMode.AutoStudy)
         {
-            await ExecuteAutoStudyAsync(credentials.Value, stoppingToken);
+            await ExecuteAutoStudyAsync(clientBridge?.Credentials ?? credentials.Value, stoppingToken);
             return;
         }
 
@@ -56,7 +79,7 @@ internal sealed class Worker(
 
         try
         {
-            var report = await readOnlyProbe.RunAsync(
+            var report = await services.GetRequiredService<LotusLmsReadOnlyProbe>().RunAsync(
                 accountCredentials,
                 _options,
                 stoppingToken);
@@ -119,10 +142,6 @@ internal sealed class Worker(
                 exception.GetType().Name,
                 exception.Message);
         }
-        finally
-        {
-            applicationLifetime.StopApplication();
-        }
     }
 
     private async Task ExecuteAutoStudyAsync(
@@ -135,7 +154,7 @@ internal sealed class Worker(
 
         try
         {
-            var report = await autoStudy.RunAsync(
+            var report = await services.GetRequiredService<LotusLmsAutoStudy>().RunAsync(
                 accountCredentials,
                 _options,
                 stoppingToken);
@@ -191,9 +210,50 @@ internal sealed class Worker(
                 exception.GetType().Name,
                 exception.Message);
         }
-        finally
+    }
+
+    private async Task ExecutePracticeOnlyAsync(
+        LotusLmsCredentialsOptions accountCredentials,
+        CancellationToken stoppingToken)
+    {
+        logger.LogInformation(
+            "Starting practice-only: {BatchSize} questions per batch, random submission intervals of {MinIntervalSeconds}-{MaxIntervalSeconds}s.",
+            _options.PracticeBatchSize, _options.PracticeIntervalSeconds, _options.PracticeMaxIntervalSeconds);
+
+        try
         {
-            applicationLifetime.StopApplication();
+            var report = await services.GetRequiredService<LotusLmsPracticeOnly>().RunAsync(accountCredentials, _options, stoppingToken);
+            logger.LogInformation(
+                "Practice-only finished: {CourseCount} courses, " +
+                "{QuestionCount} questions submitted in {BatchCount} batches; KPI gained={GainedKpiSeconds}s.",
+                report.CoursesProcessed,
+                report.QuestionsSubmitted, report.BatchesSubmitted, report.GainedKpiSeconds);
+            foreach (var course in report.Courses)
+            {
+                logger.LogInformation(
+                    "Practice-only course {CourseIid} '{CourseName}': {Outcome}.",
+                    course.CourseIid, course.Name, course.Result.Outcome);
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            logger.LogInformation("Practice-only was cancelled.");
+        }
+        catch (LotusLmsApiException exception)
+        {
+            Environment.ExitCode = 1;
+            logger.LogError(
+                "Practice-only failed at API path {ApiPath} with HTTP status {StatusCode}. " +
+                "Server message: {ServerMessage}.",
+                SafeApiPath(exception.Endpoint), exception.StatusCode,
+                SafeLogText(exception.ServerMessage));
+        }
+        catch (Exception exception)
+        {
+            Environment.ExitCode = 1;
+            logger.LogError(
+                "Practice-only failed with {ErrorType}: {SafeMessage}",
+                exception.GetType().Name, exception.Message);
         }
     }
 

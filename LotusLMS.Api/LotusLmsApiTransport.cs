@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using LotusLMS.RequestSigning;
 
 namespace LotusLMS.Api;
 
@@ -29,9 +30,11 @@ internal sealed class LotusLmsApiTransport(
         IEnumerable<KeyValuePair<string, string>> form,
         string referer,
         LotusLmsSession? session,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        LotusLmsProvider? provider = null)
     {
-        using var request = CreatePostRequest(endpoint, form, referer, session);
+        provider ??= session?.Provider;
+        using var request = CreatePostRequest(endpoint, form, referer, session, provider);
         var (_, root) = await SendAsync(request, endpoint, cancellationToken);
         return root;
     }
@@ -41,10 +44,12 @@ internal sealed class LotusLmsApiTransport(
         IEnumerable<KeyValuePair<string, string>> form,
         string referer,
         LotusLmsSession? session,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        LotusLmsProvider? provider = null)
         where TResponse : class
     {
-        using var request = CreatePostRequest(endpoint, form, referer, session);
+        provider ??= session?.Provider;
+        using var request = CreatePostRequest(endpoint, form, referer, session, provider);
         var (body, _) = await SendAsync(request, endpoint, cancellationToken);
 
         try
@@ -62,14 +67,52 @@ internal sealed class LotusLmsApiTransport(
         }
     }
 
+    public async Task<JsonObject> PostMultipartAsync(
+        string endpoint,
+        IEnumerable<KeyValuePair<string, string>> form,
+        string referer,
+        LotusLmsSession session,
+        CancellationToken cancellationToken)
+    {
+        var provider = session.Provider;
+        using var content = new MultipartFormDataContent();
+        var fields = options.GenerateRequestTokens
+            ? SandRequestTokenGenerator.Sign(form, session.UserIid, session.Token)
+            : form;
+        foreach (var field in fields)
+        {
+            content.Add(new StringContent(field.Value, System.Text.Encoding.UTF8), field.Key);
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, BuildRequestUri(endpoint, provider)) { Content = content };
+        ApplyRequestHeaders(request, referer, session, provider);
+        var (_, root) = await SendAsync(request, endpoint, cancellationToken);
+        return root;
+    }
+
     public async Task<JsonObject> GetAsync(
         string endpoint,
         string referer,
         LotusLmsSession session,
         CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-        ApplyRequestHeaders(request, referer, session);
+        var signedEndpoint = endpoint;
+        if (options.GenerateRequestTokens)
+        {
+            var tokens = SandRequestTokenGenerator.Generate(session.UserIid);
+            signedEndpoint += (endpoint.Contains('?') ? "&" : "?")
+                + SandRequestTokenGenerator.RequestIdField + "=" + Uri.EscapeDataString(tokens.RequestId)
+                + "&" + SandRequestTokenGenerator.RequestTokenField + "=" + Uri.EscapeDataString(tokens.RequestToken)
+                + "&" + SandClientSyncTokenGenerator.FieldName + "="
+                + Uri.EscapeDataString(SandClientSyncTokenGenerator.Generate(session.Token))
+                + "&_sand_token=" + Uri.EscapeDataString(session.Token)
+                + "&_sand_uiid=" + session.UserIid.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                + "&_sand_uid=" + Uri.EscapeDataString(session.UserId);
+        }
+
+        var provider = session.Provider;
+        using var request = new HttpRequestMessage(HttpMethod.Get, BuildRequestUri(signedEndpoint, provider));
+        ApplyRequestHeaders(request, referer, session, provider);
         var (_, root) = await SendAsync(request, endpoint, cancellationToken);
         return root;
     }
@@ -78,14 +121,29 @@ internal sealed class LotusLmsApiTransport(
         string endpoint,
         IEnumerable<KeyValuePair<string, string>> form,
         string referer,
-        LotusLmsSession? session)
+        LotusLmsSession? session,
+        LotusLmsProvider? provider)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+        var request = new HttpRequestMessage(HttpMethod.Post, BuildRequestUri(endpoint, provider))
         {
-            Content = new FormUrlEncodedContent(form)
+            Content = new FormUrlEncodedContent(options.GenerateRequestTokens
+                ? SandRequestTokenGenerator.Sign(form, session?.UserIid, session?.Token)
+                : form)
         };
-        ApplyRequestHeaders(request, referer, session);
+        ApplyRequestHeaders(request, referer, session, provider);
         return request;
+    }
+
+    private Uri BuildRequestUri(string endpoint, LotusLmsProvider? provider)
+    {
+        if (Uri.TryCreate(endpoint, UriKind.Absolute, out var absoluteUri))
+        {
+            return absoluteUri;
+        }
+
+        return provider is null
+            ? new Uri(endpoint, UriKind.Relative)
+            : new Uri(provider.BaseUrl.TrimEnd('/') + "/" + endpoint.TrimStart('/'), UriKind.Absolute);
     }
 
     private async Task<(string Body, JsonObject Root)> SendAsync(
@@ -158,10 +216,13 @@ internal sealed class LotusLmsApiTransport(
     private void ApplyRequestHeaders(
         HttpRequestMessage request,
         string referer,
-        LotusLmsSession? session)
+        LotusLmsSession? session,
+        LotusLmsProvider? provider)
     {
         request.Headers.Referrer = new Uri(referer, UriKind.Absolute);
-        request.Headers.TryAddWithoutValidation("Origin", options.WebOrigin.TrimEnd('/'));
+        request.Headers.TryAddWithoutValidation(
+            "Origin",
+            (provider?.WebOrigin ?? options.WebOrigin).TrimEnd('/'));
 
         if (options.SendBearerToken && session is not null)
         {
@@ -203,7 +264,9 @@ internal sealed class LotusLmsApiTransport(
 
         var message = ReadString(root["message"])
             ?? ReadString(root["error"])
-            ?? ReadString(root["error_message"]);
+            ?? ReadString(root["error_message"])
+            ?? ReadString(root["err_code"])
+            ?? ReadString(root["error_code"]);
 
         return message is { Length: > 512 } ? message[..512] : message;
     }

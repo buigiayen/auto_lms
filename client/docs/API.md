@@ -31,9 +31,12 @@ Response lỗi chung:
 | --- | --- | --- |
 | 400 | `VALIDATION_ERROR` | Dữ liệu không hợp lệ |
 | 401 | `WORKER_UNAUTHORIZED` | Thiếu/sai API key worker |
+| 401 | `WORKER_REGISTRATION_UNAUTHORIZED` | Thiếu/sai khóa bootstrap khi đăng ký Worker |
+| 503 | `WORKER_REGISTRATION_DISABLED` | Client API chưa cấu hình `WORKER_REGISTRATION_KEY` |
 | 403 | `RUN_OWNERSHIP_MISMATCH` | Sai Worker, instance, run hoặc lease token |
 | 403 | `WORKER_PROXY_MISMATCH` | Proxy không được gán cho account mà Worker đang sở hữu |
 | 409 | `ACCOUNT_CLAIMED` | Account đã được Worker tiếp nhận |
+| 409 | `ACCOUNT_DEFERRED` | Account đang được hoãn đến 00:00 ngày hôm sau theo giờ Việt Nam |
 | 409 | `LEASE_LOST` | Mất heartbeat hoặc lượt chạy đã kết thúc |
 | 409 | `ACCOUNT_BUSY` | Chờ Worker dừng trước khi sửa thông tin |
 | 404 | `ACCOUNT_NOT_FOUND` | Không tìm thấy tài khoản |
@@ -60,7 +63,7 @@ LMS với `success=false` vẫn là lỗi nghiệp vụ. Ưu tiên đọc `messa
 | PATCH | `/api/accounts/:accountId/status` | Treo/Dừng treo |
 | GET | `/api/accounts/:accountId/logs` | Xem log theo tài khoản |
 | GET | `/api/logs` | Xem log tất cả tài khoản, cùng bộ lọc/phân trang |
-| POST | `/api/workers` | Đăng ký tên Worker, trả API key một lần |
+| POST | `/api/workers` | Đăng ký/tải lại API key Worker bằng khóa bootstrap |
 | GET | `/api/worker/accounts` | Account đã Run, chưa có Worker nhận, proxy hợp lệ |
 | POST | `/api/worker/accounts/:accountId/claim` | Xác nhận tiếp nhận và lấy thông tin học viên |
 | POST | `/api/worker/accounts/:accountId/heartbeat` | Gia hạn quyền sở hữu và đọc điều khiển |
@@ -79,6 +82,8 @@ LMS với `success=false` vẫn là lỗi nghiệp vụ. Ưu tiên đọc `messa
 | GET / PATCH / DELETE | `/api/proxies/:proxyId` | Đọc, sửa hoặc xóa cấu hình chưa được gán |
 | POST | `/api/proxies/test` | Thử cấu hình mới, không lưu |
 | POST | `/api/proxies/:proxyId/test` | Thử cấu hình đang sửa, có thể giữ mật khẩu đã lưu |
+
+`POST /api/workers` yêu cầu khóa bootstrap trong header Authorization. Tên mới trả HTTP 201; tên đã đăng ký trả HTTP 200 cùng API key ổn định, chỉ khi khóa bootstrap hợp lệ. Khóa bootstrap phải có tối thiểu 32 ký tự và được cấu hình trong tiến trình Client API; nếu thiếu thì endpoint trả 503.
 
 ## 3. Tạo tài khoản
 

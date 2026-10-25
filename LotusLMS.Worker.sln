@@ -7,8 +7,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LotusLMS.Http", "LotusLMS.H
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LotusLMS.Api", "LotusLMS.Api\LotusLMS.Api.csproj", "{E7CE9F4B-4698-4D03-AFC4-A4B6DFCE2120}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LotusLMS.Worker", "LotusLMS.Worker\LotusLMS.Worker.csproj", "{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LotusLMS.RequestSigning", "LotusLMS.RequestSigning\LotusLMS.RequestSigning.csproj", "{50724271-766A-4D85-8DAB-50D01C7FD317}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LotusLMS.Client", "LotusLMS.Client\LotusLMS.Client.csproj", "{373C0C8B-46BF-4137-9F5C-4EA67B53B6E0}"
@@ -16,6 +14,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LotusLMS.Worker.V2", "LotusLMS.Worker.V2\LotusLMS.Worker.V2.csproj", "{7A6BD123-DC77-40DB-8D93-E8BBDD15FFA5}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LotusLMS.RequestSigning.Tests", "LotusLMS.RequestSigning.Tests\LotusLMS.RequestSigning.Tests.csproj", "{EED43F80-668E-46F7-B619-548C0FFD9B3B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LotusLMS.Worker.V2.Tests", "LotusLMS.Worker.V2.Tests\LotusLMS.Worker.V2.Tests.csproj", "{BAAD90DA-D50C-4202-ACE5-43C99285F534}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -51,18 +51,6 @@ Global
 		{E7CE9F4B-4698-4D03-AFC4-A4B6DFCE2120}.Release|x64.Build.0 = Release|Any CPU
 		{E7CE9F4B-4698-4D03-AFC4-A4B6DFCE2120}.Release|x86.ActiveCfg = Release|Any CPU
 		{E7CE9F4B-4698-4D03-AFC4-A4B6DFCE2120}.Release|x86.Build.0 = Release|Any CPU
-		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Debug|x64.Build.0 = Debug|Any CPU
-		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Debug|x86.Build.0 = Debug|Any CPU
-		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Release|x64.ActiveCfg = Release|Any CPU
-		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Release|x64.Build.0 = Release|Any CPU
-		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Release|x86.ActiveCfg = Release|Any CPU
-		{6C10F79C-7E29-4F4A-8F39-018C1A5EA330}.Release|x86.Build.0 = Release|Any CPU
 		{50724271-766A-4D85-8DAB-50D01C7FD317}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{50724271-766A-4D85-8DAB-50D01C7FD317}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{50724271-766A-4D85-8DAB-50D01C7FD317}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -111,6 +99,18 @@ Global
 		{EED43F80-668E-46F7-B619-548C0FFD9B3B}.Release|x64.Build.0 = Release|Any CPU
 		{EED43F80-668E-46F7-B619-548C0FFD9B3B}.Release|x86.ActiveCfg = Release|Any CPU
 		{EED43F80-668E-46F7-B619-548C0FFD9B3B}.Release|x86.Build.0 = Release|Any CPU
+		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Debug|x64.Build.0 = Debug|Any CPU
+		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Debug|x86.Build.0 = Debug|Any CPU
+		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Release|x64.ActiveCfg = Release|Any CPU
+		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Release|x64.Build.0 = Release|Any CPU
+		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Release|x86.ActiveCfg = Release|Any CPU
+		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

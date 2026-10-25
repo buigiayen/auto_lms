@@ -1,9 +1,9 @@
 # Hàng chờ học viên và Worker tiếp nhận
 
 Run/Treo đưa account vào hàng chờ (`status=running`). Backend không tạo tiến
-trình .NET: Worker được khởi động riêng sẽ lấy học viên qua API. Mỗi tiến trình
-có instanceId riêng, nhận một học viên rồi thoát khi xong. Khởi động lại tiến
-trình để nhận học viên tiếp theo. Mặc định Idle chỉ kiểm tra kết nối, không gọi LMS.
+trình .NET: Worker được khởi động riêng sẽ lấy học viên qua API. Worker V2 chạy
+nhiều lane song song; từng lane có tên, API key và instanceId riêng, rồi tiếp
+tục polling sau mỗi lượt.
 
 ```mermaid
 sequenceDiagram
@@ -35,11 +35,18 @@ sequenceDiagram
 
 ## Đăng ký và cấu hình
 
-`POST /api/workers`, body `{ "workerName": "worker-node-01" }` trên backend local.
-Response 201 trả `{ "data": { "workerName": "worker-node-01", "apiKey": "..." } }`.
-Tên dài 1–100 ký tự. Tên đã tồn tại trả 409 WORKER_EXISTS; key hiện có nằm trong
-`client/data/worker-api-keys.json`. Không có API đọc lại key. Nếu Worker ở máy
-khác, cấu hình địa chỉ backend và HTTPS. Mọi `/api/worker/*` cần
+Client API phải có `WORKER_REGISTRATION_KEY` là secret ngẫu nhiên tối thiểu 32
+ký tự. Worker V2 cấu hình cùng secret trong `Worker:RegistrationApiKey`.
+Endpoint `POST /api/workers` yêu cầu khóa bootstrap đó; thiếu hoặc sai khóa sẽ
+bị từ chối. Không cấu hình khóa ở Client API thì endpoint đăng ký bị tắt.
+
+Worker V2 tự đăng ký tên `WorkerName-01` đến
+`WorkerName-<MaxConcurrentAccounts>` lúc khởi động. Lane mới trả HTTP 201; đăng
+ký lại có xác thực trả HTTP 200 và cùng API key lane. Backend lưu các API key
+trong `client/data/worker-api-keys.json`; Worker nhận từng key trong bộ nhớ và
+dùng key riêng cho các request hàng đợi. Không cần khai báo `LaneApiKeys` hoặc
+đăng ký lane thủ công. Nếu Worker ở máy khác, cấu hình địa chỉ backend và HTTPS.
+Mọi `/api/worker/*` cần
 `Authorization: Bearer <apiKey>`; backend lấy tên Worker từ API key.
 
 ```text
@@ -138,8 +145,11 @@ gia hạn, nhận quyền sở hữu qua header X-Worker-Run-Id, X-Worker-Instan
 X-Worker-Lease-Token.
 
 `POST /api/worker/accounts/:accountId/finish` nhận cùng ba trường sở hữu và
-`outcome: "completed" | "failed" | "stopped"`. Backend nhả khóa, ghi log và
-thường chuyển account sang Dừng treo. Gửi lại cùng kết quả là idempotent.
+`outcome: "completed" | "failed" | "stopped" | "deferred"`. Backend nhả khóa,
+ghi log và với completed/failed/stopped thường chuyển account sang Dừng treo.
+`deferred` giữ account ở trạng thái Treo nhưng không cho nhận lại trước 00:00
+ngày hôm sau theo giờ Việt Nam; lane được nhận account khác trong thời gian đó.
+Nhấn Dừng treo rồi Treo lại sẽ xóa thời gian hoãn. Gửi lại cùng kết quả là idempotent.
 Nhấn Dừng rồi Run lại khi Worker đang dừng vẫn giữ khóa cũ; finish mới nhả khóa
 và giữ account trong hàng chờ cho lượt kế tiếp.
 

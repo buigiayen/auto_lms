@@ -8,7 +8,6 @@
   <ItemGroup>
     <ProjectReference Include="..\LotusLMS.Api\LotusLMS.Api.csproj" />
     <ProjectReference Include="..\LotusLMS.RequestSigning\LotusLMS.RequestSigning.csproj" />
-    <ProjectReference Include="..\LotusLMS.Worker\LotusLMS.Worker.csproj" />
     <None Include="Fixtures/cryptojs-vectors.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Fixtures/client-sync-vectors.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Fixtures/truongson-practice.json" CopyToOutputDirectory="PreserveNewest" />

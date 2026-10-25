@@ -16,13 +16,7 @@ các lane còn lại.
   "Worker": {
     "WorkerName": "worker-v2",
     "MaxConcurrentAccounts": 5,
-    "LaneApiKeys": {
-      "worker-v2-01": "<key worker-v2-01>",
-      "worker-v2-02": "<key worker-v2-02>",
-      "worker-v2-03": "<key worker-v2-03>",
-      "worker-v2-04": "<key worker-v2-04>",
-      "worker-v2-05": "<key worker-v2-05>"
-    },
+    "RegistrationApiKey": "<secret giống WORKER_REGISTRATION_KEY ở Client API>",
     "PollIntervalSeconds": 5,
     "HeartbeatIntervalSeconds": 5
   }
@@ -30,31 +24,35 @@ các lane còn lại.
 ```
 
 `WorkerName` là tiền tố để tạo tên lane `WorkerName-01` đến
-`WorkerName-<MaxConcurrentAccounts>`. Mỗi lane cần đăng ký riêng trên backend
-và có API key riêng. Ví dụ gọi `POST /api/workers` lần lượt với tên
-`worker-v2-01` ... `worker-v2-05`, rồi lấy `data.apiKey` từ mỗi response.
-Nếu tên đã tồn tại, dùng key tương ứng trong `client/data/worker-api-keys.json`.
-Worker xác thực đủ key trước khi bắt đầu claim account.
+`WorkerName-<MaxConcurrentAccounts>`. Worker tự gọi `POST /api/workers` cho
+từng lane lúc khởi động. Client API tạo lane mới hoặc trả lại cùng API key khi
+lane đã tồn tại; Worker giữ các key lane trong bộ nhớ và dùng key riêng khi
+poll/claim. Bạn không cần đăng ký lane thủ công hay cấu hình `LaneApiKeys`.
+
+`RegistrationApiKey` là khóa bootstrap chứng minh Worker được phép tự đăng ký.
+Cấu hình cùng một secret (tối thiểu 32 ký tự) ở backend qua biến môi trường
+`WORKER_REGISTRATION_KEY` và ở Worker qua User Secrets/biến môi trường. Backend
+từ chối đăng ký nếu thiếu hoặc sai khóa bootstrap.
 
 Có thể thay bằng User Secrets của project V2 hoặc biến môi trường:
 
 ```bash
 dotnet user-secrets set "Worker:WorkerName" "worker-v2" --project LotusLMS.Worker.V2
 dotnet user-secrets set "Worker:MaxConcurrentAccounts" "5" --project LotusLMS.Worker.V2
-dotnet user-secrets set "Worker:LaneApiKeys:worker-v2-01" "<API key 01>" --project LotusLMS.Worker.V2
-dotnet user-secrets set "Worker:LaneApiKeys:worker-v2-02" "<API key 02>" --project LotusLMS.Worker.V2
+dotnet user-secrets set "Worker:RegistrationApiKey" "<secret bootstrap>" --project LotusLMS.Worker.V2
 ```
 
 Base URL mặc định là localhost:3100; đổi `Client:BaseUrl` nếu backend ở nơi khác.
 Biến môi trường có dạng `Worker__WorkerName`,
-`Worker__MaxConcurrentAccounts`, `Worker__LaneApiKeys__worker-v2-01` và
-`Client__BaseUrl`. Có thể chạy một lane bằng cách đặt concurrency là 1 và chỉ
-cấu hình key `WorkerName-01`. User Secrets được dùng trong môi trường
-Development. Không lưu API key thật vào appsettings hay Git.
+`Worker__MaxConcurrentAccounts`, `Worker__RegistrationApiKey` và
+`Client__BaseUrl`. Có thể chạy một lane bằng cách đặt concurrency là 1.
+User Secrets được dùng trong môi trường Development. Không lưu secret bootstrap
+hay API key lane vào appsettings hoặc Git.
 
-`MaxConcurrentAccounts` từ 1–20 (mặc định 5), `PollIntervalSeconds` từ 1–60;
+`MaxConcurrentAccounts` từ 1–20 (mặc định 5), bootstrap key tối thiểu 32 ký tự,
+`PollIntervalSeconds` từ 1–60;
 `HeartbeatIntervalSeconds` từ 1–10. Backend hiện cấp lease 30 giây; mặc định
-heartbeat mỗi 5 giây. Thiếu tên/key hoặc cấu hình sai sẽ báo chính xác tên
+heartbeat mỗi 5 giây. Thiếu tên/bootstrap key hoặc cấu hình sai sẽ báo chính xác tên
 trường cấu hình rồi thoát với mã 1, không để
 `OptionsValidationException` kết thúc ứng dụng như exception chưa xử lý.
 Nếu đã sửa file mà vẫn lỗi, kiểm tra User Secrets và biến môi trường vì chúng
@@ -74,6 +72,12 @@ Khi API LMS trả về danh sách khóa học có mục học nhưng không còn
 `completed`; backend sẽ chuyển account sang trạng thái dừng và lane đó tiếp tục
 nhận account khác. Danh sách khóa học rỗng được xem là dữ liệu không hợp lệ,
 không tự báo hoàn thành.
+
+Nếu bật `StopOnDailyKpi` và LMS xác nhận đã đủ KPI trong ngày, Worker kết thúc
+lượt hiện tại với outcome `deferred`; account vẫn ở trạng thái **Treo**, nhưng
+được đưa khỏi hàng đợi đến 00:00 ngày hôm sau theo giờ Việt Nam. Lane được giải
+phóng để nhận account khác. Nếu muốn chạy lại sớm, nhấn **Dừng treo** rồi nhấn
+**Treo** để bỏ thời gian hoãn và đưa account vào hàng chờ ngay.
 
 Account cũ chưa chọn chương trình sẽ kết thúc `failed` kèm log yêu cầu chọn
 chương trình và Run lại. Proxy tắt/hết hạn hoặc thay đổi trong khi giữ lượt làm

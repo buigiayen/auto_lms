@@ -59,7 +59,7 @@ public sealed class LotusClient : ILotusClient, IDisposable
         DataAsync<ClientRunControl>(HttpMethod.Get, AccountPath(accountId, "control"), null, cancellationToken, ownership);
     public Task<ClientFinishResult> FinishAsync(string accountId, ClientFinishRequest request, CancellationToken cancellationToken = default)
     {
-        if (request.Outcome is not ("completed" or "failed" or "stopped")) throw new ArgumentException("Invalid worker outcome.", nameof(request));
+        if (request.Outcome is not ("completed" or "failed" or "stopped" or "deferred")) throw new ArgumentException("Invalid worker outcome.", nameof(request));
         return DataAsync<ClientFinishResult>(HttpMethod.Post, AccountPath(accountId, "finish"), request, cancellationToken);
     }
     public Task<ClientLogReceipt> SendLogAsync(ClientWorkerLog log, CancellationToken cancellationToken = default) =>

@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
+import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Store } from './store.js';
 import { LmsService, testProxy } from './lms.js';
@@ -25,7 +26,15 @@ async function readJson(req) {
   return value;
 }
 
-export function createApp({ directory = fileURLToPath(new URL('../../data/', import.meta.url)), lmsOptions, proxyTester = testProxy, clock } = {}) {
+export function createApp({
+  directory = fileURLToPath(new URL('../../data/', import.meta.url)),
+  lmsOptions,
+  proxyTester = testProxy,
+  clock,
+  workerRegistrationKey = process.env.WORKER_REGISTRATION_KEY
+} = {}) {
+  if (workerRegistrationKey && workerRegistrationKey.length < 32)
+    throw new Error('WORKER_REGISTRATION_KEY phải có ít nhất 32 ký tự.');
   const store = new Store(directory, { clock }), lms = new LmsService(store, lmsOptions);
   const server = createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -55,11 +64,20 @@ export function createApp({ directory = fileURLToPath(new URL('../../data/', imp
       if (path === '/api/accounts' && method === 'POST') { send(201, { data: store.saveAccount(await readJson(req)) }); return; }
       if (path === '/api/logs' && method === 'GET') { send(200, store.logs(null, uri.searchParams, pageParams(uri.searchParams, 50))); return; }
       if (path === '/api/workers' && method === 'POST') {
+        if (!workerRegistrationKey) throw new AppError(503, 'WORKER_REGISTRATION_DISABLED', 'Chưa cấu hình WORKER_REGISTRATION_KEY trên Client API.');
+        const authorization = req.headers.authorization ?? '';
+        const prefix = 'Bearer ';
+        const supplied = Buffer.from(authorization.startsWith(prefix) ? authorization.slice(prefix.length) : '');
+        const expected = Buffer.from(workerRegistrationKey);
+        if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected))
+          throw new AppError(401, 'WORKER_REGISTRATION_UNAUTHORIZED', 'Khóa bootstrap Worker không hợp lệ.');
+
         const input = await readJson(req);
         requireValue(typeof input.workerName === 'string' && input.workerName.trim().length > 0 && input.workerName.trim().length <= 100, 'Tên worker dài từ 1–100 ký tự.', 'workerName');
         const workerName = input.workerName.trim();
-        if (Object.hasOwn(store.workerKeys, workerName)) throw new AppError(409, 'WORKER_EXISTS', 'Tên Worker đã có API key. Dùng key trong file cấu hình local hoặc chọn tên khác.');
-        store.ensureWorker(workerName); send(201, { data: { workerName, apiKey: store.workerKeys[workerName] } }); return;
+        const existed = Object.hasOwn(store.workerKeys, workerName);
+        store.ensureWorker(workerName);
+        send(existed ? 200 : 201, { data: { workerName, apiKey: store.workerKeys[workerName] } }); return;
       }
       if (path === '/api/worker/accounts' && method === 'GET') {
         store.workerForToken(req.headers.authorization);

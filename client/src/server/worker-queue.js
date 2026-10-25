@@ -29,16 +29,21 @@ export class WorkerQueue {
     const isActive = run && ['accepted', 'running', 'stopping'].includes(run.state);
     const last = this.db.prepare(`SELECT message,level,occurred_at FROM worker_logs WHERE account_id=? ${run ? 'AND run_id=?' : ''} ORDER BY occurred_at DESC,id DESC LIMIT 1`)
       .get(account.id, ...(run ? [run.id] : []));
-    return { state: isActive ? run.state : account.status === 'running' ? 'queued' : run?.state ?? 'stopped',
+    const deferred = account.available_after && Date.parse(account.available_after) > this.store.clock();
+    return { state: isActive ? run.state : account.status === 'running'
+      ? deferred ? 'deferred' : 'queued'
+      : run?.state === 'deferred' ? 'stopped' : run?.state ?? 'stopped',
       runId: run?.id ?? null, workerName: run?.worker_name ?? null, lastHeartbeatAt: run?.last_heartbeat_at ?? null,
       leaseExpiresAt: isActive ? run.lease_expires_at : null,
+      availableAfter: deferred ? account.available_after : null,
       lastLog: last ? { message: last.message, level: last.level, occurredAt: last.occurred_at } : null };
   }
   available(query, paging) {
     this.reap();
     const params = [], filters = ["a.status='running'", `NOT EXISTS(SELECT 1 FROM worker_runs r WHERE r.account_id=a.id AND r.${active})`,
+      '(a.available_after IS NULL OR a.available_after<=?)',
       "(p.id IS NULL OR (p.enabled=1 AND (p.expires_on IS NULL OR p.expires_on>=?)))"];
-    // Format without relying on the backend machine's local timezone.
+    params.push(this.now());
     params.push(new Date(this.store.clock() + 7 * 3600000).toISOString().slice(0, 10));
     if (query.get('accountId')) { filters.push('a.id=?'); params.push(query.get('accountId')); }
     const sql = `FROM accounts a LEFT JOIN proxies p ON p.id=a.proxy_id WHERE ${filters.join(' AND ')}`;
@@ -62,6 +67,8 @@ export class WorkerQueue {
       }
       const account = this.store.rawAccount(accountId);
       if (account.status !== 'running') throw new AppError(409, 'ACCOUNT_NOT_QUEUED', 'Account chưa được nhấn Run hoặc đã dừng.');
+      if (account.available_after && Date.parse(account.available_after) > this.store.clock())
+        throw new AppError(409, 'ACCOUNT_DEFERRED', 'Account đang được tạm hoãn đến ngày mai.');
       this.store.accountProxy(accountId);
       if (this.active(accountId)) throw new AppError(409, 'ACCOUNT_CLAIMED', 'Account đã được Worker khác tiếp nhận.');
       if (this.db.prepare(`SELECT 1 FROM worker_runs WHERE instance_id=? AND ${active}`).get(input.instanceId))
@@ -117,18 +124,36 @@ export class WorkerQueue {
     });
   }
   finish(accountId, workerName, input) {
-    requireValue(['completed','failed','stopped'].includes(input.outcome), 'outcome phải là completed, failed hoặc stopped.', 'outcome');
+    requireValue(['completed','failed','stopped','deferred'].includes(input.outcome), 'outcome phải là completed, failed, stopped hoặc deferred.', 'outcome');
     return this.transaction(() => {
       const run = this.verify(accountId, workerName, input, { logs: true });
-      if (['completed','failed','stopped'].includes(run.state)) {
+      if (['completed','failed','stopped','deferred'].includes(run.state)) {
         if (run.state !== input.outcome) throw new AppError(409, 'RUN_OUTCOME_CONFLICT', 'Lượt chạy đã kết thúc với kết quả khác.');
         return { runId: run.id, state: run.state };
       }
       if (run.state === 'lost') throw new AppError(409, 'LEASE_LOST', 'Lượt chạy đã mất quyền sở hữu.');
       this.db.prepare('UPDATE worker_runs SET state=?,finished_at=? WHERE id=?').run(input.outcome, this.now(), run.id);
       // A fresh Run requested during shutdown stays queued after the previous worker acknowledges stopping.
-      if (run.state !== 'stopping') this.db.prepare("UPDATE accounts SET status='stopped',updated_at=? WHERE id=?").run(this.now(), accountId);
-      this.event(run, input.outcome === 'failed' ? 'error' : 'info', `Worker ${workerName} kết thúc lượt chạy: ${input.outcome}.`);
+      if (run.state !== 'stopping') {
+        if (input.outcome === 'deferred') {
+          const vietnamDate = new Date(this.store.clock() + 7 * 3600000);
+          const nextMidnightUtc = Date.UTC(
+            vietnamDate.getUTCFullYear(),
+            vietnamDate.getUTCMonth(),
+            vietnamDate.getUTCDate() + 1
+          ) - 7 * 3600000;
+          const availableAfter = new Date(nextMidnightUtc).toISOString();
+          this.db.prepare('UPDATE accounts SET available_after=?,updated_at=? WHERE id=?')
+            .run(availableAfter, this.now(), accountId);
+        } else {
+          this.db.prepare("UPDATE accounts SET status='stopped',available_after=NULL,updated_at=? WHERE id=?")
+            .run(this.now(), accountId);
+        }
+      }
+      this.event(run, input.outcome === 'failed' ? 'error' : 'info',
+        input.outcome === 'deferred'
+          ? `Worker ${workerName} tạm hoãn account đến ngày mai sau khi đạt KPI trong ngày.`
+          : `Worker ${workerName} kết thúc lượt chạy: ${input.outcome}.`);
       return { runId: run.id, state: input.outcome };
     });
   }

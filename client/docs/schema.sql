@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     enrolment_plan_name TEXT NOT NULL DEFAULT '',
     device_uuid TEXT NOT NULL CHECK (length(device_uuid) = 36),
     proxy_id TEXT REFERENCES proxies(id) ON DELETE RESTRICT,
+    available_after TEXT,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     UNIQUE (provider, identity_number)
@@ -43,7 +44,7 @@ CREATE TABLE IF NOT EXISTS worker_runs (
     instance_id TEXT NOT NULL,
     request_id TEXT NOT NULL,
     lease_token_ciphertext TEXT NOT NULL,
-    state TEXT NOT NULL CHECK(state IN ('accepted','running','stopping','completed','failed','stopped','lost')),
+    state TEXT NOT NULL CHECK(state IN ('accepted','running','stopping','completed','failed','stopped','deferred','lost')),
     accepted_at TEXT NOT NULL,
     last_heartbeat_at TEXT NOT NULL,
     lease_expires_at TEXT NOT NULL,
@@ -75,4 +76,3 @@ CREATE INDEX IF NOT EXISTS idx_worker_logs_account_time
 
 CREATE INDEX IF NOT EXISTS idx_worker_logs_account_level_time
     ON worker_logs (account_id, level, occurred_at DESC, id DESC);
-

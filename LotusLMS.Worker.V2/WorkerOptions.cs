@@ -7,7 +7,7 @@ public sealed class WorkerOptions
     public const string SectionName = "Worker";
     public string WorkerName { get; set; } = "";
     public int MaxConcurrentAccounts { get; init; } = 5;
-    public Dictionary<string, string> LaneApiKeys { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public string RegistrationApiKey { get; init; } = "";
     public int PollIntervalSeconds { get; init; }
     public int HeartbeatIntervalSeconds { get; init; }
     public int StatusIntervalSeconds { get; init; } = 60;
@@ -28,7 +28,7 @@ public sealed class WorkerOptions
     // track-time every N learning-time saves (client uses 3).
     public int KpiCheckEverySaves { get; init; } = 3;
 
-    // Auto-study: optionally stop the whole job as soon as the daily KPI is reached.
+    // Auto-study: defer the current account until tomorrow after the daily KPI is reached.
     // Disabled by default so completed courses advance to the next course in order.
     public bool StopOnDailyKpi { get; init; }
 
@@ -64,15 +64,8 @@ public sealed class WorkerOptions
             yield return "Worker:WorkerName phải dài 1–96 ký tự, không có khoảng trắng ở hai đầu.";
         if (MaxConcurrentAccounts is < 1 or > 20)
             yield return "Worker:MaxConcurrentAccounts phải từ 1 đến 20.";
-        else if (workerNameIsValid)
-        {
-            for (var lane = 1; lane <= MaxConcurrentAccounts; lane++)
-            {
-                var name = GetLaneWorkerName(lane);
-                if (!LaneApiKeys.TryGetValue(name, out var apiKey) || string.IsNullOrWhiteSpace(apiKey))
-                    yield return $"Worker:LaneApiKeys:{name} cần API key đã đăng ký cho worker này.";
-            }
-        }
+        if (RegistrationApiKey.Length < 32)
+            yield return "Worker:RegistrationApiKey cần secret bootstrap tối thiểu 32 ký tự, được cấu hình giống WORKER_REGISTRATION_KEY trên Client API.";
         if (PollIntervalSeconds is < 1 or > 60)
             yield return "Worker:PollIntervalSeconds phải từ 1 đến 60 giây.";
         if (HeartbeatIntervalSeconds is < 1 or > 10)

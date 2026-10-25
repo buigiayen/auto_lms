@@ -20,20 +20,47 @@ internal sealed class Worker(
     {
         var settings = options.Value;
         var processingFactory = new AccountProcessingFactory(lmsDefaults, options, clock, loggerFactory);
-        var lanes = Enumerable.Range(1, settings.MaxConcurrentAccounts)
-            .Select(number => new WorkerLane(
-                settings.GetLaneWorkerName(number),
-                settings.LaneApiKeys[settings.GetLaneWorkerName(number)],
-                clientDefaults.Value,
-                options,
-                clock,
-                processingFactory,
-                loggerFactory))
-            .ToArray();
+        var registrationClient = CreateClient(clientDefaults.Value, settings.RegistrationApiKey);
+        var lanes = new List<WorkerLane>(settings.MaxConcurrentAccounts);
+        try
+        {
+            for (var number = 1; number <= settings.MaxConcurrentAccounts; number++)
+            {
+                var laneName = settings.GetLaneWorkerName(number);
+                var registration = await registrationClient.RegisterWorkerAsync(laneName, stoppingToken);
+                if (registration.WorkerName != laneName || string.IsNullOrWhiteSpace(registration.ApiKey))
+                    throw new InvalidDataException($"Client API trả thông tin đăng ký không hợp lệ cho lane {laneName}.");
+
+                lanes.Add(new WorkerLane(
+                    laneName,
+                    registration.ApiKey,
+                    clientDefaults.Value,
+                    options,
+                    clock,
+                    processingFactory,
+                    loggerFactory));
+                _logger.LogInformation("Lane {WorkerName} registered with Client API.", laneName);
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception error)
+        {
+            _logger.LogCritical(error, "Worker lane registration failed; no lane will claim accounts.");
+            Environment.ExitCode = 1;
+            applicationLifetime.StopApplication();
+            return;
+        }
+        finally
+        {
+            registrationClient.Dispose();
+        }
 
         _logger.LogInformation(
             "Worker coordinator started {LaneCount} independent lanes for {WorkerName}.",
-            lanes.Length,
+            lanes.Count,
             settings.WorkerName);
 
         await Task.WhenAll(lanes.Select(lane => lane.RunAsync(stoppingToken)));
@@ -44,6 +71,25 @@ internal sealed class Worker(
             Environment.ExitCode = 1;
             applicationLifetime.StopApplication();
         }
+    }
+
+    private static LotusClient CreateClient(LotusClientOptions defaults, string apiKey)
+    {
+        var http = new HttpClient(new SocketsHttpHandler
+        {
+            UseProxy = false,
+            AllowAutoRedirect = false
+        })
+        {
+            BaseAddress = new Uri(defaults.BaseUrl.TrimEnd('/') + "/", UriKind.Absolute),
+            Timeout = TimeSpan.FromSeconds(defaults.RequestTimeoutSeconds)
+        };
+        return new LotusClient(http, Options.Create(new LotusClientOptions
+        {
+            BaseUrl = defaults.BaseUrl,
+            ApiKey = apiKey,
+            RequestTimeoutSeconds = defaults.RequestTimeoutSeconds
+        }));
     }
 }
 
@@ -163,13 +209,13 @@ internal sealed class WorkerLane(
                         outcome = result switch
                         {
                             AccountStudyResult.Completed => "completed",
-                            AccountStudyResult.DailyKpiReached => "stopped",
+                            AccountStudyResult.DailyKpiReached => "deferred",
                             _ => "failed"
                         };
                         reason = result switch
                         {
                             AccountStudyResult.Completed => "Đã hoàn thành chương trình học.",
-                            AccountStudyResult.DailyKpiReached => "Đã đạt KPI trong ngày.",
+                            AccountStudyResult.DailyKpiReached => "Đã đạt KPI trong ngày; account được tạm hoãn đến 00:00 ngày mai (giờ Việt Nam).",
                             _ => "Quy trình học chưa hoàn tất."
                         };
                     }

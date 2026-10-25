@@ -71,6 +71,9 @@ Check(handler.Json?["context"]?["courseIid"]?.GetValue<int>() == 22 && handler.J
 handler.Body = $$$"""{"data":{"runId":"{{{runId}}}","state":"completed"}}""";
 var finished = await client.FinishAsync(accountId, new ClientFinishRequest { RunId = runId, InstanceId = instanceId, LeaseToken = leaseToken, Outcome = "completed" });
 Check(finished.State == "completed" && handler.Json?["outcome"]?.GetValue<string>() == "completed", "finish returns the typed result");
+handler.Body = $$$"""{"data":{"runId":"{{{runId}}}","state":"deferred"}}""";
+finished = await client.FinishAsync(accountId, new ClientFinishRequest { RunId = runId, InstanceId = instanceId, LeaseToken = leaseToken, Outcome = "deferred" });
+Check(finished.State == "deferred" && handler.Json?["outcome"]?.GetValue<string>() == "deferred", "finish accepts daily-KPI deferral");
 handler.Body = "{\"data\":{\"workerName\":\"new-worker\",\"apiKey\":\"new-key\"}}";
 var registration = await client.RegisterWorkerAsync("new-worker");
 Check(registration.ApiKey == "new-key" && handler.Uri!.AbsolutePath == "/root/api/workers", "worker registration is reusable outside the Worker app");

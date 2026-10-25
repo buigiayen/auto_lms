@@ -114,19 +114,50 @@ tên Worker thực tế; Worker khác nhận cùng account sẽ nhận `409 ACCO
 Bảng account tự làm mới mỗi 5 giây, hiển thị Chờ Worker / Đã tiếp nhận / Đang xử
 lý / Đang dừng cùng log gần nhất. “Xem log” xem lịch sử từng lượt chạy.
 
-Đăng ký tên Worker và lấy API key một lần (giá trị minh họa):
+Đăng ký tên Worker yêu cầu khóa bootstrap mà Client API đọc từ biến môi trường
+`WORKER_REGISTRATION_KEY`:
+
+Có thể tạo khóa 256-bit tại mục **Worker & khóa** trong giao diện Client. Khóa
+được tạo trong trình duyệt, không gửi hoặc lưu ở Backend. Sao chép khóa rồi đặt
+cùng một giá trị cho `WORKER_REGISTRATION_KEY` của Backend và
+`Worker:RegistrationApiKey` của Worker; khởi động lại Backend sau khi thay đổi
+biến môi trường. Không tải lại trang trước khi sao chép vì khóa chỉ tồn tại tạm
+trong trang đang mở.
+
+```bash
+export WORKER_REGISTRATION_KEY='<secret tối thiểu 32 ký tự>'
+npm start
+```
+
+Gọi API đăng ký thủ công cần gửi cùng khóa bootstrap:
 
 ```bash
 curl http://127.0.0.1:3100/api/workers \
+  -H "Authorization: Bearer $WORKER_REGISTRATION_KEY" \
   -H 'Content-Type: application/json' \
   -d '{"workerName":"worker-node-01"}'
 ```
 
-Tên đã tồn tại trả `409`; API key có trong file local
-`client/data/worker-api-keys.json`. Không đưa key vào Git. Worker không cần nhập
-căn cước/mật khẩu hoặc nhà cung cấp khi kết nối client; claim thành công trả
-thông tin học viên và provider. Worker đọc `proxyId` từ chi tiết account rồi
-lấy thông tin proxy qua `/api/proxies/:proxyId` bằng quyền sở hữu lượt chạy.
+Tên mới trả `201`; đăng ký lại với khóa bootstrap hợp lệ trả `200` và cùng API
+key lane đã tạo trước đó. Worker V2 tự đăng ký các tên lane từ `WorkerName` và
+`MaxConcurrentAccounts`; chỉ cần cấu hình cùng secret trong
+`Worker:RegistrationApiKey` của Worker. API key từng lane chỉ được trả cho
+khóa bootstrap hợp lệ và được giữ riêng trong `client/data/worker-api-keys.json`
+với quyền truy cập local. Không đưa key vào Git.
+
+Worker V2:
+
+```bash
+dotnet user-secrets set "Worker:WorkerName" "worker-v2" --project LotusLMS.Worker.V2
+dotnet user-secrets set "Worker:MaxConcurrentAccounts" "5" --project LotusLMS.Worker.V2
+dotnet user-secrets set "Worker:RegistrationApiKey" "$WORKER_REGISTRATION_KEY" --project LotusLMS.Worker.V2
+```
+
+Worker không cần nhập căn cước/mật khẩu hoặc nhà cung cấp; claim thành công trả
+thông tin account và provider. Worker đọc `proxyId` từ chi tiết account rồi lấy
+proxy qua `/api/proxies/:proxyId` với quyền sở hữu lượt chạy. Các cấu hình
+`Client__WorkerName`/`Client__ApiKey` dưới đây áp dụng cho worker client cũ,
+không phải Worker V2.
 
 ```text
 Client__Enabled=true

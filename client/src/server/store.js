@@ -66,9 +66,10 @@ export class Store {
         for (const column of ['course_iid', 'course_name'])
           if (accountColumns.includes(column)) this.db.exec(`ALTER TABLE accounts DROP COLUMN ${column}`);
         this.db.exec('COMMIT');
-      } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+      } catch (error) { this.db.exec('ROLLBACK'); throw error;       }
     }
-    this.db.exec('PRAGMA user_version=7');
+    this.migrateWorkerDeferral();
+    this.db.exec('PRAGMA user_version=8');
     this.queue = new WorkerQueue(this);
     this.workerKeyFile = join(directory, 'worker-api-keys.json');
     this.workerKeys = Object.assign(Object.create(null), existsSync(this.workerKeyFile) ? JSON.parse(readFileSync(this.workerKeyFile, 'utf8')) : {});
@@ -81,6 +82,55 @@ export class Store {
       this.db.exec('ALTER TABLE proxies ADD COLUMN expires_on TEXT');
     }
     this.db.exec('PRAGMA user_version=3');
+  }
+
+  migrateWorkerDeferral() {
+    const accountColumns = this.db.prepare('PRAGMA table_info(accounts)').all().map(column => column.name);
+    const workerRunsSql = this.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='worker_runs'").get()?.sql ?? '';
+    const needsAvailableAfter = !accountColumns.includes('available_after');
+    const needsDeferredState = !workerRunsSql.includes("'deferred'");
+    if (!needsAvailableAfter && !needsDeferredState) return;
+
+    const backup = join(this.directory, 'client.before-worker-deferral.sqlite');
+    if (!existsSync(backup)) this.db.prepare('VACUUM INTO ?').run(backup);
+    if (needsAvailableAfter)
+      this.db.exec('ALTER TABLE accounts ADD COLUMN available_after TEXT');
+    if (needsDeferredState) {
+      this.db.exec('PRAGMA foreign_keys=OFF');
+      this.db.exec('BEGIN IMMEDIATE');
+      try {
+        this.db.exec(`CREATE TABLE worker_runs_migration (
+            id TEXT PRIMARY KEY NOT NULL,
+            account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+            worker_name TEXT NOT NULL,
+            instance_id TEXT NOT NULL,
+            request_id TEXT NOT NULL,
+            lease_token_ciphertext TEXT NOT NULL,
+            state TEXT NOT NULL CHECK(state IN ('accepted','running','stopping','completed','failed','stopped','deferred','lost')),
+            accepted_at TEXT NOT NULL,
+            last_heartbeat_at TEXT NOT NULL,
+            lease_expires_at TEXT NOT NULL,
+            finished_at TEXT,
+            UNIQUE(worker_name,instance_id,request_id)
+        );
+        INSERT INTO worker_runs_migration
+            SELECT id,account_id,worker_name,instance_id,request_id,lease_token_ciphertext,state,
+              accepted_at,last_heartbeat_at,lease_expires_at,finished_at
+            FROM worker_runs;
+        DROP TABLE worker_runs;
+        ALTER TABLE worker_runs_migration RENAME TO worker_runs;
+        CREATE UNIQUE INDEX idx_worker_runs_active_account ON worker_runs(account_id)
+            WHERE state IN ('accepted','running','stopping');
+        CREATE UNIQUE INDEX idx_worker_runs_active_instance ON worker_runs(instance_id)
+            WHERE state IN ('accepted','running','stopping');`);
+        this.db.exec('COMMIT');
+      } catch (error) {
+        this.db.exec('ROLLBACK');
+        throw error;
+      } finally {
+        this.db.exec('PRAGMA foreign_keys=ON');
+      }
+    }
   }
 
   migrateProxies() {
@@ -244,8 +294,8 @@ export class Store {
     const planIid = selectedPlan?.enrolmentPlanIid ?? current.enrolment_plan_iid;
     const planName = selectedPlan?.enrolmentPlanName ?? current.enrolment_plan_name;
     if (status === 'stopped') this.db.prepare("UPDATE worker_runs SET state='stopping' WHERE account_id=? AND state IN ('accepted','running')").run(id);
-    this.db.prepare('UPDATE accounts SET status=?,proxy_id=?,enrolment_plan_iid=?,enrolment_plan_name=?,updated_at=? WHERE id=? AND (status<>? OR proxy_id IS NOT ? OR enrolment_plan_iid IS NOT ? OR enrolment_plan_name<>?)')
-      .run(status, proxyId, planIid, planName, now(), id, status, proxyId, planIid, planName);
+    this.db.prepare('UPDATE accounts SET status=?,proxy_id=?,enrolment_plan_iid=?,enrolment_plan_name=?,available_after=NULL,updated_at=? WHERE id=?')
+      .run(status, proxyId, planIid, planName, now(), id);
     return this.account(id);
   }
 

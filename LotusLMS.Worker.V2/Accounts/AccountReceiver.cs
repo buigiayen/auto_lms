@@ -66,7 +66,8 @@ internal sealed class AccountReceiver(
                 accountDetails.IdentityNumber);
         }
         catch (LotusClientException error) when (error.Code is "ACCOUNT_CLAIMED" or "ACCOUNT_NOT_QUEUED"
-            or "CLAIM_CLOSED" or "PROXY_EXPIRED" or "PROXY_DISABLED" || error.StatusCode == HttpStatusCode.NotFound)
+            or "ACCOUNT_DEFERRED" or "CLAIM_CLOSED" or "PROXY_EXPIRED" or "PROXY_DISABLED"
+            || error.StatusCode == HttpStatusCode.NotFound)
         {
             logger.LogInformation("Account {AccountId} không còn sẵn sàng ({Code}); tải lại hàng chờ.", _accountId, error.Code);
             Release();

@@ -121,6 +121,9 @@ bản ghi. Sau đó xóa bảng cũ và đặt `user_version=2`. Chạy lại kh
 
 Account, mật khẩu, GUID thiết bị, log và API key worker được giữ nguyên.
 Sao lưu/khôi phục cần giữ cả file SQLite và `credential.key` tương ứng.
+`worker-api-keys.json` chứa API key riêng theo tên Worker/lane. Worker V2 chỉ
+nhận key lane qua endpoint đăng ký có xác thực bằng `WORKER_REGISTRATION_KEY`;
+secret bootstrap không được lưu trong database hoặc file key này.
 
 ### Ngày hết hạn proxy (schema 3)
 
@@ -168,4 +171,15 @@ Migration tự sao lưu trước ALTER vào `client.before-enrolment-plan-select
 thêm trường chương trình còn thiếu và bỏ `course_iid`, `course_name` của schema 6.
 Giữ nguyên `enrolment_plan_iid` đã lưu và dữ liệu tài khoản, mật khẩu, GUID, proxy,
 lượt chạy, log. Tên chương trình cũ để rỗng cho đến khi chọn lại, không lấy tên
-khóa học cũ. Mở lại ứng dụng giữ nguyên lựa chọn. `user_version` hiện tại là 7.
+khóa học cũ. Mở lại ứng dụng giữ nguyên lựa chọn.
+
+## 10. Hoãn account sau KPI trong ngày (schema 8)
+
+Thêm `accounts.available_after` để giữ account ở trạng thái Treo nhưng tạm ẩn
+khỏi hàng chờ đến thời điểm đó. Khi Worker kết thúc lượt với `deferred`, Backend
+đặt thời điểm nhận lại là 00:00 ngày tiếp theo theo giờ Việt Nam; Worker lane
+được giải phóng cho account khác. Run/Treo thủ công xóa thời gian hoãn.
+
+Migration sao lưu vào `client.before-worker-deferral.sqlite`, thêm cột
+`available_after` và mở rộng trạng thái kết thúc của `worker_runs` bằng
+`deferred`, giữ nguyên các lượt và log cũ. `user_version` hiện tại là 8.

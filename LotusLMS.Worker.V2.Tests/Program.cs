@@ -27,18 +27,14 @@ Check(!new WorkerOptions
 {
     WorkerName = "a",
     MaxConcurrentAccounts = 1,
-    LaneApiKeys = new() { ["a-01"] = "fixture-key" },
+    RegistrationApiKey = "fixture-bootstrap-key-0123456789abcdef",
     HeartbeatIntervalSeconds = 30
 }.IsValid(), "heartbeat stays inside backend lease");
 var validLaneOptions = new WorkerOptions
 {
     WorkerName = "worker-01",
     MaxConcurrentAccounts = 2,
-    LaneApiKeys = new()
-    {
-        ["worker-01-01"] = "fixture-key-1",
-        ["worker-01-02"] = "fixture-key-2"
-    },
+    RegistrationApiKey = "fixture-bootstrap-key-0123456789abcdef",
     PollIntervalSeconds = 5,
     HeartbeatIntervalSeconds = 5
 };
@@ -51,13 +47,14 @@ Check(!new WorkerOptions
 {
     WorkerName = "worker-01",
     MaxConcurrentAccounts = 2,
-    LaneApiKeys = new() { ["worker-01-01"] = "fixture-key" },
+    RegistrationApiKey = "",
     PollIntervalSeconds = 5,
     HeartbeatIntervalSeconds = 5
-}.IsValid(), "each configured lane requires its own registered API key");
+}.IsValid(), "worker bootstrap registration key is required");
 var validation = new WorkerOptions
 {
     WorkerName = "",
+    RegistrationApiKey = "fixture-bootstrap-key-0123456789abcdef",
     PollIntervalSeconds = 5,
     HeartbeatIntervalSeconds = 5
 }.ValidationErrors().ToArray();
@@ -66,7 +63,7 @@ validation = new WorkerOptions
 {
     WorkerName = "worker-01",
     MaxConcurrentAccounts = 1,
-    LaneApiKeys = new() { ["worker-01-01"] = "fixture-key" },
+    RegistrationApiKey = "fixture-bootstrap-key-0123456789abcdef",
     PollIntervalSeconds = 0,
     HeartbeatIntervalSeconds = 30
 }.ValidationErrors().ToArray();

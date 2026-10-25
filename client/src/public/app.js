@@ -64,6 +64,11 @@ function toast(message, error = false) {
   $("#toasts").append(item);
   setTimeout(() => item.remove(), 4500);
 }
+function createRegistrationKey() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 function errorBox(selector, message) {
   const box = $(selector);
   if (!box) return;
@@ -82,6 +87,7 @@ const executionLabels = {
   failed: "Lỗi",
   lost: "Mất kết nối",
   stopped: "Đã dừng",
+  deferred: "Tạm hoãn đến ngày mai",
 };
 const spinner = (message) =>
   `<div class="loading"><span class="spinner"></span>${escape(message)}</div>`;
@@ -867,7 +873,9 @@ $("#proxy-list").addEventListener("click", async (event) => {
 let logTimer;
 function navigate() {
   const view = location.hash.slice(1);
-  state.view = ["accounts", "logs", "proxy"].includes(view) ? view : "accounts";
+  state.view = ["accounts", "logs", "proxy", "workers"].includes(view)
+    ? view
+    : "accounts";
   closeDialog();
   clearInterval(logTimer);
   document.querySelectorAll(".page").forEach((page) => {
@@ -884,6 +892,7 @@ function navigate() {
     accounts: "Tài khoản",
     logs: "Nhật ký worker",
     proxy: "Cấu hình proxy",
+    workers: "Worker & khóa",
   }[state.view];
   document.title = `${$("#breadcrumb").textContent} · Lotus Client`;
   if (state.view === "accounts") {
@@ -976,5 +985,29 @@ $("#logs-prev").onclick = () => {
 $("#logs-next").onclick = () => {
   state.logPage++;
   loadLogs();
+};
+$("#generate-registration-key").onclick = () => {
+  if (
+    $("#registration-key-value").value &&
+    !confirm("Tạo khóa mới sẽ thay thế khóa đang hiển thị. Tiếp tục?")
+  )
+    return;
+  try {
+    $("#registration-key-value").value = createRegistrationKey();
+    $("#registration-key-result").hidden = false;
+  } catch {
+    toast("Trình duyệt không hỗ trợ tạo khóa an toàn. Hãy mở giao diện qua localhost hoặc HTTPS.", true);
+  }
+};
+$("#copy-registration-key").onclick = async () => {
+  const input = $("#registration-key-value");
+  try {
+    await navigator.clipboard.writeText(input.value);
+    toast("Đã sao chép RegistrationApiKey.");
+  } catch {
+    input.focus();
+    input.select();
+    toast("Không thể truy cập clipboard. Khóa đã được chọn để bạn sao chép thủ công.", true);
+  }
 };
 navigate();

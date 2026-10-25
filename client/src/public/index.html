@@ -32,6 +32,7 @@
       <a href="#accounts" class="nav-link active" data-nav="accounts"><svg><use href="#i-users"/></svg>Tài khoản<span class="nav-count" id="nav-count">0</span></a>
       <a href="#logs" class="nav-link" data-nav="logs"><svg><use href="#i-log"/></svg>Nhật ký worker</a>
       <a href="#proxy" class="nav-link" data-nav="proxy"><svg><use href="#i-network"/></svg>Cấu hình proxy</a>
+      <a href="#workers" class="nav-link" data-nav="workers"><svg><use href="#i-server"/></svg>Worker &amp; khóa</a>
     </nav>
     <div class="sidebar-bottom"><div class="local-note"><svg><use href="#i-shield"/></svg><span>Dữ liệu trên máy bạn<small>Tài khoản được mã hóa khi lưu</small></span></div><div class="sidebar-foot"><span class="status-dot"></span> LOCAL INSTANCE<span>v1.0</span></div></div>
   </aside>
@@ -65,6 +66,31 @@
         <div class="page-heading"><div><div class="eyebrow">KẾT NỐI <span>03</span></div><h1>Cấu hình proxy</h1><p>Lưu nhiều cấu hình và chọn một proxy riêng cho mỗi tài khoản.</p></div><span class="badge" id="proxy-badge">Chưa tải</span></div>
         <div class="settings-grid"><form class="panel proxy-form" id="proxy-form"><div class="panel-heading"><div><h2 id="proxy-editor-title">Thêm cấu hình proxy</h2><p>Chọn cấu hình này trong form tạo hoặc sửa tài khoản.</p></div><label class="switch"><input type="checkbox" id="proxy-enabled" aria-label="Bật proxy"><span></span></label></div><div class="form-body"><label class="proxy-name-field">Tên cấu hình<input id="proxy-name" required maxlength="100" placeholder="Ví dụ: Proxy Trường Sơn 01" autocomplete="off"></label><div class="field-row proxy-address"><label>Giao thức<select id="proxy-protocol"><option value="http">HTTP</option><option value="https">HTTPS</option></select></label><label>Host<input id="proxy-host" placeholder="proxy.example" autocomplete="off"></label><label>Port<input id="proxy-port" placeholder="29087" inputmode="numeric" type="number" min="1" max="65535"></label></div><div class="field-row"><label>Username<input id="proxy-username" placeholder="Tên đăng nhập proxy" autocomplete="off"></label><label>Password<input id="proxy-password" type="password" placeholder="Để trống để giữ mật khẩu" autocomplete="new-password"></label></div><label class="proxy-expiry-field">Ngày hết hạn proxy xoay<input id="proxy-expires-on" type="date" min="1000-01-01" max="9999-12-31"><span class="field-help">Có hiệu lực đến hết ngày theo giờ Việt Nam. Để trống nếu chưa đặt hạn.</span></label><label class="checkbox-label"><input id="proxy-clear" type="checkbox">Xóa mật khẩu đang lưu</label><p class="field-help">Hỗ trợ HTTP/HTTPS. Không cần tài khoản nếu proxy xác thực bằng IP.</p><div id="proxy-error" class="inline-error" role="alert" hidden></div><div id="proxy-result" class="test-result" role="status" hidden></div></div><div class="form-footer"><button type="button" class="button" id="test-proxy"><svg><use href="#i-network"/></svg>Kiểm tra kết nối</button><button type="submit" class="button primary"><svg><use href="#i-check"/></svg>Lưu cấu hình</button></div></form>
         <aside class="proxy-catalog panel"><div class="panel-heading"><div><h2>Cấu hình đã lưu</h2><p>Mỗi tài khoản chọn một cấu hình.</p></div><button class="button small" id="new-proxy" type="button" aria-label="Thêm cấu hình proxy"><svg><use href="#i-plus"/></svg>Thêm</button></div><div id="proxy-list"></div><div class="proxy-catalog-note">Đổi proxy trong form “Sửa tài khoản”. Proxy đang được sử dụng cần được gỡ khỏi tài khoản trước khi xóa.</div></aside></div>
+      </section>
+      <section id="workers-page" class="page" hidden>
+        <div class="page-heading"><div><div class="eyebrow">TỰ ĐỘNG HÓA <span>04</span></div><h1>Worker &amp; khóa đăng ký</h1><p>Tạo khóa bootstrap an toàn để Worker được phép tự đăng ký các lane với Backend.</p></div></div>
+        <section class="panel worker-key-panel">
+          <div class="panel-heading"><div><h2><svg><use href="#i-shield"/></svg>RegistrationApiKey</h2><p>Khóa ngẫu nhiên 256-bit, đáp ứng yêu cầu tối thiểu 32 ký tự.</p></div></div>
+          <div class="worker-key-body">
+            <div class="worker-key-notice"><strong>Lưu ý:</strong> Khóa được tạo ngay trong trình duyệt, không gửi tới Backend và không được lưu sau khi đóng hoặc tải lại trang. Hãy sao chép và cấu hình cùng một giá trị ở Backend lẫn Worker.</div>
+            <div class="worker-key-actions"><button class="button primary" id="generate-registration-key" type="button"><svg><use href="#i-shield"/></svg>Tạo khóa mới</button></div>
+            <div id="registration-key-result" hidden>
+              <label class="worker-key-label" for="registration-key-value">Khóa bootstrap — giữ bí mật</label>
+              <div class="worker-key-copy"><input id="registration-key-value" type="text" readonly autocomplete="off" spellcheck="false" aria-describedby="registration-key-help"><button class="button" id="copy-registration-key" type="button"><svg><use href="#i-copy"/></svg>Sao chép</button></div>
+              <p class="field-help" id="registration-key-help">Nếu mất khóa, hãy tạo khóa mới và cập nhật ở cả Backend lẫn Worker.</p>
+            </div>
+            <div class="worker-key-steps">
+              <h3>Cách sử dụng</h3>
+              <ol>
+                <li>Trong terminal chạy Backend, đặt biến môi trường <code>WORKER_REGISTRATION_KEY</code> rồi khởi động lại Client API:<pre><code>export WORKER_REGISTRATION_KEY="&lt;khóa vừa sao chép&gt;"
+npm start</code></pre></li>
+                <li>Ở Worker V2, đặt <code>Worker:RegistrationApiKey</code> bằng đúng khóa đó. Ví dụ dùng User Secrets:<pre><code>dotnet user-secrets set "Worker:RegistrationApiKey" "&lt;khóa vừa sao chép&gt;" --project LotusLMS.Worker.V2</code></pre></li>
+                <li>Khởi động Worker. Worker sẽ tự đăng ký từng lane; Backend tạo và cấp API key riêng cho từng lane.</li>
+              </ol>
+              <p class="field-help">Không gửi khóa qua chat, không lưu vào Git hoặc appsettings. Nếu Backend đã chạy, cần khởi động lại sau khi thay đổi biến môi trường.</p>
+            </div>
+          </div>
+        </section>
       </section>
     </div>
     <footer class="page-footer"><span>LOTUS CLIENT</span><span>Không gian quản lý của bạn.</span></footer>

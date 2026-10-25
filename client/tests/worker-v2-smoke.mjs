@@ -13,7 +13,12 @@ if (!existsSync(binary)) throw new Error('Build LotusLMS.Worker.V2 before runnin
 const directory = mkdtempSync(join(tmpdir(), 'lotus-worker-v2-'));
 let upstreamCalls = 0, dropClaim = true, dropLog = true, dropFinish = true, listRequests = 0, finishRequests = 0;
 let delayedFinishAccount = null, parallelSecondAccount = null, finishResponsePending = false, parallelClaimedDuringFinish = false;
-const app = createApp({ directory, lmsOptions: { fetcher: async () => { upstreamCalls++; throw new Error('Unexpected LMS call'); } } });
+const registrationKey = 'fixture-worker-registration-key-0123456789abcdef';
+const app = createApp({
+  directory,
+  workerRegistrationKey: registrationKey,
+  lmsOptions: { fetcher: async () => { upstreamCalls++; throw new Error('Unexpected LMS call'); } }
+});
 // Drop responses after the real backend commits. Worker must retry the same claim/event IDs.
 app.server.prependListener('request', (req, res) => {
   if (req.url.startsWith('/api/worker/accounts?')) listRequests++;
@@ -52,16 +57,11 @@ async function until(predicate, label, timeout = 15000) {
 function start(name, key, laneCount = 1) {
   const workerName = laneCount === 1 ? name.replace(/-\d{2}$/, '') : name;
   const laneNames = Array.from({ length: laneCount }, (_, index) => `${workerName}-${String(index + 1).padStart(2, '0')}`);
-  for (const laneName of laneNames) app.store.ensureWorker(laneName);
-  const laneKeyEnvironment = Object.fromEntries(laneNames.map((laneName, index) => [
-    `Worker__LaneApiKeys__${laneName}`,
-    index === 0 && key ? key : app.store.workerKeys[laneName]
-  ]));
   const child = spawn('dotnet', [binary], { cwd: workerDirectory, env: { ...process.env,
     DOTNET_ENVIRONMENT: 'Production', DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_CLI_HOME: join(directory, 'dotnet-home'),
     Client__BaseUrl: `http://127.0.0.1:${app.server.address().port}`,
     Client__RequestTimeoutSeconds: laneCount > 1 ? '10' : '2', Worker__WorkerName: workerName,
-    Worker__MaxConcurrentAccounts: String(laneCount), ...laneKeyEnvironment,
+    Worker__MaxConcurrentAccounts: String(laneCount), Worker__RegistrationApiKey: key ?? registrationKey,
     Worker__PollIntervalSeconds: '1', Worker__HeartbeatIntervalSeconds: '1',
     Http__Proxy__Enabled: 'false', LotusLms__LogApiResponses: 'false'
   }, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -87,7 +87,6 @@ const createAccount = (identityNumber, provider = 'truongson', proxyId = null) =
   identityNumber, password: 'fixture-student-password', provider, proxyId
 });
 try {
-  app.store.ensureWorker('worker-v2-a-01'); app.store.ensureWorker('worker-v2-b-01');
   const account = createAccount('000000000001');
   app.store.setStatus(account.id, 'running', null, { enrolmentPlanIid: 99, enrolmentPlanName: 'Chương trình A' });
   start('worker-v2-a-01'); start('worker-v2-b-01');
@@ -129,15 +128,20 @@ try {
     'one process runs accounts on both independent lanes',
     25000);
   const multiRuns = [runs(multiFirst.id)[0], runs(multiSecond.id)[0]];
-  assert.equal(new Set(multiRuns.map(run => run.worker_name)).size, 2, 'parallel accounts use different lane worker identities');
+  assert.equal(
+    new Set(multiRuns.map(run => run.worker_name)).size,
+    2,
+    `parallel accounts use different lane worker identities: ${multiRuns.map(run => run.worker_name).join(', ')}`
+  );
   assert.equal(new Set(multiRuns.map(run => run.instance_id)).size, 2, 'parallel lanes have isolated instance IDs');
   assert.ok(parallelClaimedDuringFinish, 'second lane claims an account before the first lane completes its finish response');
   await stop(multiLaneWorker);
 
-  const unauthorized = start('worker-v2-unauthorized-01', 'invalid-fixture-key');
+  const unauthorized = start('worker-v2-unauthorized-01', 'invalid-fixture-bootstrap-key-0123456789abcdef');
   await until(() => unauthorized.exited, 'invalid API key stops worker');
   assert.equal(unauthorized.code, 1, 'authentication errors must exit with a failure code');
-  assert.ok(unauthorized.output.includes('UNAUTHORIZED'), 'auth failure must be visible');
+  assert.ok(unauthorized.output.includes('UNAUTHORIZED'),
+    `auth failure must be visible in worker output: ${unauthorized.output}`);
   assert.equal(upstreamCalls, 0);
   for (const worker of workers.values()) {
     assert.ok(!worker.output.includes('fixture-student-password') && !worker.output.includes('fixture-proxy-password'));

@@ -46,7 +46,7 @@ test('atomic claims from independent SQLite connections prevent duplicate studen
 
 test('queue API enforces ownership, heartbeat expiry, stop/restart, per-run logs and credential isolation', async () => {
   const directory = temp(); let time = Date.parse('2040-01-01T00:00:00Z');
-  const app = createApp({ directory, clock: () => time });
+  const app = createApp({ directory, clock: () => time, workerRegistrationKey: 'fixture-registration-key-0123456789abcdef' });
   await new Promise(resolve => app.server.listen(0,'127.0.0.1',resolve));
   const origin = `http://127.0.0.1:${app.server.address().port}`;
   const call = async (path, method='GET', body, workerName) => {
@@ -54,10 +54,8 @@ test('queue API enforces ownership, heartbeat expiry, stop/restart, per-run logs
     return {status:r.status,...(r.status===204?{}:await r.json())};
   };
   try {
-    const registered = await call('/api/workers','POST',{workerName:'worker-a'});
-    assert.equal(registered.status,201); assert.equal(registered.data.apiKey,app.store.workerKeys['worker-a']);
-    assert.equal((await call('/api/workers','POST',{workerName:'worker-a'})).status,409);
-    await call('/api/workers','POST',{workerName:'worker-b'});
+    app.store.ensureWorker('worker-a');
+    app.store.ensureWorker('worker-b');
     const account = app.store.saveAccount(accountInput);
     const second = app.store.saveAccount({...accountInput,identityNumber:'000000000002',status:'stopped'});
     const proxy = app.store.saveProxy({name:'Will expire',enabled:true,address:'http://proxy.example:29087',expiresOn:'2039-12-31'});
@@ -120,6 +118,47 @@ test('queue API enforces ownership, heartbeat expiry, stop/restart, per-run logs
   } finally {await app.close();rmSync(directory,{recursive:true});}
 });
 
+test('daily KPI deferral keeps accounts Treo, frees the lane and resumes at Vietnam midnight', () => {
+  const directory = temp();
+  let time = Date.parse('2040-01-01T12:00:00Z');
+  const store = new Store(directory, { clock: () => time });
+  try {
+    const deferredAccount = store.saveAccount(accountInput);
+    const otherAccount = store.saveAccount({ ...accountInput, identityNumber: '000000000002' });
+    const run = store.queue.claim(deferredAccount.id, 'lane-01', claimInput('lane-01'));
+
+    const finished = store.queue.finish(deferredAccount.id, 'lane-01', {
+      ...ownership(run),
+      outcome: 'deferred'
+    });
+    assert.equal(finished.state, 'deferred');
+    assert.equal(store.account(deferredAccount.id).status, 'running');
+    assert.equal(store.account(deferredAccount.id).execution.state, 'deferred');
+    assert.equal(store.account(deferredAccount.id).execution.availableAfter, '2040-01-01T17:00:00.000Z');
+    assert.deepEqual(
+      store.queue.available(new URLSearchParams(), { page: 1, pageSize: 20, offset: 0 }).data.map(a => a.id).sort(),
+      [otherAccount.id].sort(),
+      'the lane can claim other accounts while this account is deferred'
+    );
+
+    time = Date.parse('2040-01-01T17:00:00Z');
+    assert.deepEqual(
+      store.queue.available(new URLSearchParams(), { page: 1, pageSize: 20, offset: 0 }).data.map(a => a.id).sort(),
+      [deferredAccount.id, otherAccount.id].sort(),
+      'the deferred account becomes available at midnight UTC+7'
+    );
+
+    time = Date.parse('2040-01-01T12:00:00Z');
+    store.setStatus(deferredAccount.id, 'running');
+    assert.equal(store.account(deferredAccount.id).execution.state, 'queued');
+    assert.ok(store.queue.available(new URLSearchParams(), { page: 1, pageSize: 20, offset: 0 })
+      .data.some(a => a.id === deferredAccount.id), 'a manual Run clears the deferral');
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true });
+  }
+});
+
 test('schema upgrade preserves old accounts and logs and backs up before adding run IDs', () => {
   const directory=temp();let store=new Store(directory);
   try{
@@ -132,6 +171,57 @@ test('schema upgrade preserves old accounts and logs and backs up before adding 
     assert.equal(store.db.prepare('SELECT message FROM worker_logs').get().message,'Legacy log');
     assert.equal(store.decrypt(store.rawAccount(account.id).password_ciphertext),accountInput.password);
     assert.equal(store.account(account.id).execution.state,'queued');
-    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,7);
+    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,8);
   }finally{store.close();rmSync(directory,{recursive:true});}
+});
+
+test('worker deferral migration preserves existing runs and restores foreign keys', () => {
+  const directory = temp();
+  let store = new Store(directory);
+  try {
+    const account = store.saveAccount(accountInput);
+    const run = store.queue.claim(account.id, 'lane-01', claimInput('lane-01'));
+    store.queue.finish(account.id, 'lane-01', { ...ownership(run), outcome: 'stopped' });
+    store.close();
+
+    const db = new DatabaseSync(join(directory, 'client.sqlite'));
+    db.exec(`PRAGMA foreign_keys=OFF;
+      CREATE TABLE worker_runs_migration_old (
+        id TEXT PRIMARY KEY NOT NULL,
+        account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+        worker_name TEXT NOT NULL,
+        instance_id TEXT NOT NULL,
+        request_id TEXT NOT NULL,
+        lease_token_ciphertext TEXT NOT NULL,
+        state TEXT NOT NULL CHECK(state IN ('accepted','running','stopping','completed','failed','stopped','lost')),
+        accepted_at TEXT NOT NULL,
+        last_heartbeat_at TEXT NOT NULL,
+        lease_expires_at TEXT NOT NULL,
+        finished_at TEXT,
+        UNIQUE(worker_name,instance_id,request_id)
+      );
+      INSERT INTO worker_runs_migration_old
+        SELECT id,account_id,worker_name,instance_id,request_id,lease_token_ciphertext,state,
+          accepted_at,last_heartbeat_at,lease_expires_at,finished_at FROM worker_runs;
+      DROP TABLE worker_runs;
+      ALTER TABLE worker_runs_migration_old RENAME TO worker_runs;
+      CREATE UNIQUE INDEX idx_worker_runs_active_account ON worker_runs(account_id)
+        WHERE state IN ('accepted','running','stopping');
+      CREATE UNIQUE INDEX idx_worker_runs_active_instance ON worker_runs(instance_id)
+        WHERE state IN ('accepted','running','stopping');
+      ALTER TABLE accounts DROP COLUMN available_after;
+      PRAGMA user_version=7;`);
+    db.close();
+
+    store = new Store(directory);
+    assert.ok(existsSync(join(directory, 'client.before-worker-deferral.sqlite')));
+    assert.ok(store.db.prepare("SELECT sql FROM sqlite_master WHERE name='worker_runs'").get().sql.includes("'deferred'"));
+    assert.ok(store.db.prepare('PRAGMA table_info(accounts)').all().some(column => column.name === 'available_after'));
+    assert.equal(store.db.prepare('SELECT id,state FROM worker_runs').get().state, 'stopped');
+    assert.equal(store.db.prepare('PRAGMA foreign_key_check').all().length, 0);
+    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 8);
+  } finally {
+    store.close();
+    rmSync(directory, { recursive: true });
+  }
 });

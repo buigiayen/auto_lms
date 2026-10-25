@@ -70,8 +70,8 @@ với dịch vụ khác vì SDK cấu hình BaseAddress và Timeout của nó.
 | `HeartbeatAsync(accountId, ownership, ct)` | Gia hạn quyền sở hữu và đọc điều khiển |
 | `GetControlAsync(accountId, ownership, ct)` | Chỉ đọc điều khiển bằng header, không gia hạn |
 | `SendLogAsync(log, ct)` | Gửi log kèm runId và eventId; trả thông tin chống trùng |
-| `FinishAsync(accountId, request, ct)` | Xác nhận completed / failed / stopped |
-| `RegisterWorkerAsync(workerName, ct)` | Đăng ký Worker trên backend local, lấy API key một lần |
+| `FinishAsync(accountId, request, ct)` | Xác nhận completed / failed / stopped / deferred |
+| `RegisterWorkerAsync(workerName, ct)` | Dùng bearer key bootstrap để đăng ký/tải lại API key ổn định cho Worker |
 
 `ClientAccount` có `ManagingTeacher`, `Execution`, proxy tóm tắt và chương trình
 đã chọn: `EnrolmentPlanIid` (int?), `EnrolmentPlanName`. Hai trường này cũng có trên
@@ -125,6 +125,10 @@ await backend.FinishAsync(account.Id, new ClientFinishRequest {
     Outcome = "completed"
 }, ct);
 ```
+
+`RegisterWorkerAsync` dùng `LotusClientOptions.ApiKey` làm bearer bootstrap key;
+Client API phải cấu hình cùng secret qua `WORKER_REGISTRATION_KEY`. API key
+được trả về là key riêng của worker đã đăng ký và dùng cho các API queue.
 
 SDK không tự chạy vòng heartbeat, nhận account kế tiếp hoặc retry. Ứng dụng gọi
 SDK phải gửi heartbeat mỗi 5 giây, dừng khi mất lease/nhận stopped, và giữ cùng

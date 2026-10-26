@@ -6,8 +6,8 @@ Compose v2 hỗ trợ `up --wait`. Image hỗ trợ Linux `amd64` và `arm64`.
 Hai image của repository:
 
 ```text
-ghcr.io/buigiayen/tool-auto-study-huelms-client
-ghcr.io/buigiayen/tool-auto-study-huelms-worker-v2
+ghcr.io/buigiayen/auto_lms-client
+ghcr.io/buigiayen/auto_lms-worker-v2
 ```
 
 ## 1. Publish image từ GitHub

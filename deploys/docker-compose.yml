@@ -2,7 +2,7 @@ name: lotuslms
 
 services:
   client:
-    image: ${IMAGE_PREFIX:-ghcr.io/buigiayen/tool-auto-study-huelms}-client:${IMAGE_TAG:-latest}
+    image: ${IMAGE_PREFIX:-ghcr.io/buigiayen/auto_lms}-client:${IMAGE_TAG:-latest}
     restart: unless-stopped
     init: true
     stop_grace_period: 30s
@@ -38,7 +38,7 @@ services:
         max-file: "3"
 
   worker:
-    image: ${IMAGE_PREFIX:-ghcr.io/buigiayen/tool-auto-study-huelms}-worker-v2:${IMAGE_TAG:-latest}
+    image: ${IMAGE_PREFIX:-ghcr.io/buigiayen/auto_lms}-worker-v2:${IMAGE_TAG:-latest}
     restart: unless-stopped
     init: true
     stop_grace_period: 60s

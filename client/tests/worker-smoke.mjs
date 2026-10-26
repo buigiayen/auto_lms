@@ -11,7 +11,7 @@ const workerDirectory = fileURLToPath(new URL('../../LotusLMS.Worker/', import.m
 const binary = join(workerDirectory, 'bin/Debug/net10.0/LotusLMS.Worker.dll');
 if (!existsSync(binary)) throw new Error('Build LotusLMS.Worker.sln before running test:worker.');
 const directory = mkdtempSync(join(tmpdir(), 'lotus-worker-smoke-'));
-const app = createApp({ directory });
+const app = createApp({ adminAuth: { username: 'fixture-admin', password: 'fixture-admin-password' }, directory });
 await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
 const account = app.store.saveAccount({ identityNumber: '000000000001', password: 'fixture-password', provider: 'truongson', workerName: 'preferred-worker', status: 'running' });
 app.store.ensureWorker('worker-smoke');

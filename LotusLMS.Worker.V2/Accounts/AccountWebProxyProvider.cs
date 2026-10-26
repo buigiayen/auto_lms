@@ -20,21 +20,13 @@ internal sealed class AccountWebProxyProvider : IWebProxyProvider
             return;
         }
 
-        if (!config.Enabled
-            || !Uri.TryCreate(config.Address, UriKind.Absolute, out var address)
-            || address.Scheme is not ("http" or "https")
-            || address.UserInfo.Length > 0
-            || address.Query.Length > 0
-            || address.Fragment.Length > 0
-            || config.ExpiresAt is { } expiresAt && expiresAt <= serverTime)
+        if (!WorkerProxyConfiguration.TryCreateWebProxy(config, serverTime, out var proxy))
         {
             throw new InvalidDataException("Account proxy is disabled, expired or invalid.");
         }
 
-        _proxy.Address = address;
-        _proxy.Credentials = string.IsNullOrEmpty(config.Username)
-            ? null
-            : new NetworkCredential(config.Username, config.Password);
+        _proxy.Address = proxy!.Address;
+        _proxy.Credentials = proxy.Credentials;
         _proxy.BypassProxyOnLocal = false;
     }
 }

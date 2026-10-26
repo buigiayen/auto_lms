@@ -60,7 +60,8 @@ Nếu đã sửa file mà vẫn lỗi, kiểm tra User Secrets và biến môi t
 
 ## Vận hành và tra log
 
-1. Chạy backend trong thư mục `client` bằng `npm start`.
+1. Chạy Client và Worker V2 từ thư mục gốc bằng `docker compose up -d` (hoặc
+   chạy Client riêng trong thư mục `client` bằng `npm start`).
 2. Tạo account, chọn proxy còn hạn hoặc kết nối trực tiếp.
 3. Nhấn **Run/Treo → Tải chương trình → chọn chương trình học → Chạy tài khoản**.
 4. Chạy Worker đã cấu hình. Bảng account hiển thị tên Worker và log tiếp nhận.
@@ -75,7 +76,9 @@ không tự báo hoàn thành.
 
 Nếu bật `StopOnDailyKpi` và LMS xác nhận đã đủ KPI trong ngày, Worker kết thúc
 lượt hiện tại với outcome `deferred`; account vẫn ở trạng thái **Treo**, nhưng
-được đưa khỏi hàng đợi đến 00:00 ngày hôm sau theo giờ Việt Nam. Lane được giải
+được đưa khỏi hàng đợi đến một thời điểm ngẫu nhiên trong khung **00:00–08:00
+ngày hôm sau theo giờ Việt Nam**. Backend chọn riêng cho từng account, lưu lịch
+để giữ nguyên khi khởi động lại và ghi thời điểm cụ thể vào log. Lane được giải
 phóng để nhận account khác. Nếu muốn chạy lại sớm, nhấn **Dừng treo** rồi nhấn
 **Treo** để bỏ thời gian hoãn và đưa account vào hàng chờ ngay.
 
@@ -91,6 +94,36 @@ thời được retry có giới hạn bởi thời hạn lease sau khi nhận a
 thể xác nhận finish, lane dừng để tránh nhận account mới khi quyền sở hữu chưa
 rõ. Lỗi xác minh IP proxy cũng kết thúc account `failed` và dừng lane đó.
 
+Log lỗi LMS ghi mã HTTP khi có phản hồi và phân biệt lỗi đọc JSON, timeout,
+DNS/socket và TLS. Thiếu mã HTTP không tự được xem là lỗi mạng. Đường dẫn API
+trong log không chứa query; không ghi nguyên văn exception có thể chứa dữ liệu phiên.
+Lỗi đọc kiểu JSON vẫn giữ mã HTTP thực tế (ví dụ HTTP 200).
+
+Log terminal trong mỗi lượt có tiền tố
+`[lane=<tên lane> account=<accountId> run=<runId> plan=<enrolmentPlanIid>]`
+và thời gian đến mili giây. `run` là lượt chạy ở Client API; không phải mã phiên
+đăng nhập LMS. Không ghi mật khẩu, token, cookie hay nội dung đáp án.
+
+- `PLAN_READ`: số mục và số mục phân biệt trong kế hoạch vừa lấy từ LMS.
+  `PLAN_DUPLICATE` cảnh báo cùng course/item xuất hiện nhiều dòng trong kế hoạch.
+- `THEORY_SELECT` / `PRACTICE_SELECT`: bài đang được xử lý, kèm course/item hoặc
+  practice. Đây là log chọn bài, chưa phải request ghi dữ liệu.
+- `THEORY_SEND` / `THEORY_ACK`: trước lần gọi lưu thời gian và sau khi API trả
+  thành công. Cùng `sendId` là hai trạng thái của một lần gọi. `seq` là thứ tự lưu,
+  `seconds` là số giây cộng thêm; `THEORY_PROGRESS` ghi tiến độ LMS trước/sau lưu.
+- `PRACTICE_START_SEND` / `PRACTICE_START_ACK`: mở lượt ôn luyện, kèm số `attempt`
+  và mã lượt làm bài `take` trả về.
+- `PRACTICE_SEND` / `PRACTICE_ACK`: một lần lưu batch, có `sendId`, course,
+  practice, take, attempt, số batch và danh sách ID câu hỏi. ACK ghi thêm
+  `returnedTake`, `gainedKpi`, `overtime` và `serverFinished`; API thành công chưa
+  đồng nghĩa được cộng KPI.
+- `PRACTICE_REPEAT` ở mức Warning: cùng bài được chọn lại sau refresh trong
+  luồng ôn luyện, với `attempt` tăng. Cảnh báo chỉ phục vụ chẩn đoán, không chặn bài.
+
+Đối chiếu gửi lặp theo account, run, course, item/practice và take/batch/câu hỏi.
+`SEND` không có `ACK` nghĩa là lần gọi chưa được xác nhận; không thể kết luận LMS
+chưa ghi dữ liệu. `sendId` chỉ dùng nối log, không phải khóa chống trùng phía LMS.
+
 ## Context cho bước xử lý tiếp theo
 
 `Accounts/AccountRunContext.cs` giữ `EnrolmentPlanIid`, tên chương trình, provider
@@ -104,6 +137,12 @@ request:
   để lấy `proxyId` → `GET /api/proxies/:proxyId` với ownership headers. Worker
   cấu hình HTTP transport từ proxy trả về; không dùng proxy trong appsettings.
   Account không gán proxy sẽ kết nối trực tiếp.
+- Worker nhận cấu hình chuẩn gồm URL HTTP/HTTPS/SOCKS5 và username/password riêng; đồng thời
+  chuẩn hóa tương thích chuỗi nhà cung cấp `host:port:username:password` (HTTP).
+  Dấu `:` bên trong mật khẩu được giữ nguyên; host IPv6 phải được đặt trong ngoặc vuông.
+  Ví dụ SOCKS5: `socks5://160.250.166.18:11548`; dùng SocksPort, để trống
+  username/password nếu nhà cung cấp không yêu cầu. Chuỗi nhà cung cấp có thể
+  thêm tiền tố `socks5://` để giữ giao thức SOCKS5.
 - Sau khi đăng nhập LMS thành công, nếu account có proxy Worker kiểm tra IP egress
   qua proxy và gửi IP đó về Client API. Nếu không xác minh được IP, Worker gửi
   log lỗi, kết thúc lượt `failed` và dừng lane đang xử lý account đó.
@@ -147,6 +186,7 @@ dotnet build LotusLMS.Worker.V2 --configuration Debug
 cd client
 npm test
 npm run test:worker-v2
+npm run test:worker-v2-isolation
 node tests/worker-v2-startup-smoke.mjs
 ```
 
@@ -155,3 +195,13 @@ lease và log. Smoke test tạo SQLite tạm, chạy hai tiến trình Worker th
 kiểm tra cạnh tranh, mất phản hồi claim/log/finish, heartbeat, proxy hết hạn, Dừng,
 account kế tiếp, thiếu chương trình, shutdown và API key sai. Không dùng học
 viên thật hoặc gọi LMS. Worker cũ giữ nguyên.
+
+`test:worker-v2-isolation` chạy một Worker thật với hai lane và LMS giả trên
+localhost. Hai account cùng course/item nhưng có tiến độ riêng; kiểm tra token,
+cookie, session và GUID thiết bị không bị dùng lẫn. Một request của account A
+được giữ chờ đến khi B hoàn tất để xác nhận B không bị chặn bởi A.
+
+Chạy `npm run test:worker-v2-isolation -- --different-pending-items` để kiểm tra
+A còn ba bài, B đã hoàn thành bài đầu và chỉ còn hai bài. Kiểm thử đối chiếu
+request ghi thực tế: A gửi ba ID, B chỉ gửi hai ID chưa đạt dù A đang chờ lưu bài
+mà B đã hoàn thành. Cả hai tình huống dùng luồng lý thuyết và LMS giả trên localhost.

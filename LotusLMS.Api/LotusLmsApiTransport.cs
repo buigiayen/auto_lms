@@ -35,7 +35,7 @@ internal sealed class LotusLmsApiTransport(
     {
         provider ??= session?.Provider;
         using var request = CreatePostRequest(endpoint, form, referer, session, provider);
-        var (_, root) = await SendAsync(request, endpoint, cancellationToken);
+        var (_, root, _) = await SendAsync(request, endpoint, cancellationToken);
         return root;
     }
 
@@ -50,12 +50,12 @@ internal sealed class LotusLmsApiTransport(
     {
         provider ??= session?.Provider;
         using var request = CreatePostRequest(endpoint, form, referer, session, provider);
-        var (body, _) = await SendAsync(request, endpoint, cancellationToken);
+        var (body, _, statusCode) = await SendAsync(request, endpoint, cancellationToken);
 
         try
         {
             return JsonSerializer.Deserialize<TResponse>(body, ResponseSerializerOptions)
-                ?? throw InvalidJsonResponse(endpoint);
+                ?? throw InvalidJsonResponse(endpoint, statusCode);
         }
         catch (JsonException exception)
         {
@@ -63,6 +63,7 @@ internal sealed class LotusLmsApiTransport(
                 $"LotusLMS response could not be deserialized as {typeof(TResponse).Name} " +
                 $"at JSON path {exception.Path ?? "$"}.",
                 endpoint,
+                statusCode,
                 innerException: exception);
         }
     }
@@ -86,7 +87,7 @@ internal sealed class LotusLmsApiTransport(
 
         using var request = new HttpRequestMessage(HttpMethod.Post, BuildRequestUri(endpoint, provider)) { Content = content };
         ApplyRequestHeaders(request, referer, session, provider);
-        var (_, root) = await SendAsync(request, endpoint, cancellationToken);
+        var (_, root, _) = await SendAsync(request, endpoint, cancellationToken);
         return root;
     }
 
@@ -113,7 +114,7 @@ internal sealed class LotusLmsApiTransport(
         var provider = session.Provider;
         using var request = new HttpRequestMessage(HttpMethod.Get, BuildRequestUri(signedEndpoint, provider));
         ApplyRequestHeaders(request, referer, session, provider);
-        var (_, root) = await SendAsync(request, endpoint, cancellationToken);
+        var (_, root, _) = await SendAsync(request, endpoint, cancellationToken);
         return root;
     }
 
@@ -146,7 +147,7 @@ internal sealed class LotusLmsApiTransport(
             : new Uri(provider.BaseUrl.TrimEnd('/') + "/" + endpoint.TrimStart('/'), UriKind.Absolute);
     }
 
-    private async Task<(string Body, JsonObject Root)> SendAsync(
+    private async Task<(string Body, JsonObject Root, System.Net.HttpStatusCode StatusCode)> SendAsync(
         HttpRequestMessage request,
         string endpoint,
         CancellationToken cancellationToken)
@@ -159,11 +160,12 @@ internal sealed class LotusLmsApiTransport(
                 HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
             throw new LotusLmsApiException(
                 "The LotusLMS request timed out.",
-                endpoint);
+                endpoint,
+                innerException: exception);
         }
         catch (HttpRequestException exception)
         {
@@ -209,7 +211,7 @@ internal sealed class LotusLmsApiTransport(
                     serverMessage);
             }
 
-            return (body, root);
+            return (body, root, response.StatusCode);
         }
     }
 

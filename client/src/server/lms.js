@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { isIP } from "node:net";
-import { fetch, ProxyAgent } from "undici";
+import { fetch, ProxyAgent, Socks5ProxyAgent } from "undici";
 import { AppError, requireValue } from "./errors.js";
 import { sign } from "./signing.js";
 
@@ -50,6 +50,12 @@ const dailyKpiRefererCourseIid = 110;
 
 export function proxyAgent(proxy) {
   if (!proxy.enabled) return undefined;
+  if (new URL(proxy.address).protocol === "socks5:") {
+    return new Socks5ProxyAgent(proxy.address, {
+      username: proxy.username || undefined,
+      password: proxy.password || undefined,
+    });
+  }
   return new ProxyAgent({
     uri: proxy.address,
     ...(proxy.username

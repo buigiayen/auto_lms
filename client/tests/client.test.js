@@ -40,6 +40,17 @@ test('SQLite persists encrypted credentials, leading zeroes, GUID, status, and p
     store.setStatus(id, 'running');
     const proxy = store.saveProxy({ name: 'Local proxy', enabled: true, address: 'http://localhost:29087', username: 'proxy-user', password: 'proxy-secret' });
     assert.equal(store.proxy(proxy.id).password, undefined);
+    const providerProxy = store.saveProxy({
+      name: 'Provider proxy', enabled: true, address: 'proxy.example:29089:provider-user:provider:secret',
+    });
+    assert.equal(store.proxy(providerProxy.id).address, 'http://proxy.example:29089');
+    assert.equal(store.proxy(providerProxy.id, true).username, 'provider-user');
+    assert.equal(store.proxy(providerProxy.id, true).password, 'provider:secret');
+    const legacyProviderProxy = store.saveProxy({
+      name: 'Legacy provider proxy', enabled: true, address: 'https://proxy.example:29090:legacy-user:legacy-secret',
+    });
+    assert.equal(store.proxy(legacyProviderProxy.id).address, 'https://proxy.example:29090');
+    assert.equal(store.proxy(legacyProviderProxy.id, true).password, 'legacy-secret');
     store.saveProxy({ name: proxy.name, enabled: true, address: 'http://localhost:29088', username: 'proxy-user' }, proxy.id);
     store.saveAccount({ proxyId: proxy.id }, id);
     assert.equal(store.accountProxy(id).password, 'proxy-secret');
@@ -77,7 +88,7 @@ test('HTTP account, log, status, proxy and LMS modal flow work end to end withou
     return new Response(JSON.stringify(rawCourses));
   };
   let testedProxy;
-  const app = createApp({ directory, lmsOptions: { fetcher }, proxyTester: async p => { testedProxy = p; return { ip: '203.0.113.10', viaProxy: p.enabled }; } });
+  const app = createApp({ adminAuth: null, directory, lmsOptions: { fetcher }, proxyTester: async p => { testedProxy = p; return { ip: '203.0.113.10', viaProxy: p.enabled }; } });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${app.server.address().port}`;
   async function call(path, { method = 'GET', body, headers = {} } = {}) {
@@ -185,7 +196,13 @@ test('HTTP account, log, status, proxy and LMS modal flow work end to end withou
       await call('/api/proxies/test', { method: 'POST', body: unchanged });
       assert.equal(testedProxy.password, '');
       assert.equal((await call(`/api/proxies/${proxyId}`, { method: 'DELETE' })).status, 409);
-      assert.equal((await call('/api/proxies', { method: 'POST', body: { ...settings, address: 'socks5://proxy:90' } })).status, 400);
+      const socks = await call('/api/proxies', { method: 'POST', body: {
+        name: 'SOCKS5 không xác thực', enabled: true, address: 'socks5://160.250.166.18:11548', username: '',
+      } });
+      assert.equal(socks.status, 201);
+      assert.equal(socks.body.data.address, 'socks5://160.250.166.18:11548');
+      assert.equal(app.store.proxy(socks.body.data.id, true).password, '');
+      assert.equal((await call('/api/proxies', { method: 'POST', body: { ...settings, address: 'ftp://proxy:90' } })).status, 400);
       assert.equal((await call(`/api/accounts/${id}`, { method: 'PATCH', body: { proxyId: randomUUID() } })).status, 404);
       await call(`/api/proxies/${proxyId}`, { method: 'PATCH', body: { ...unchanged, enabled: false } });
       assert.equal((await call(`/api/accounts/${id}/enrolment-plans`, { headers })).status, 410);

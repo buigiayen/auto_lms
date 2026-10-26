@@ -1,10 +1,13 @@
-import { randomUUID, randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomUUID, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { AppError, requireValue } from './errors.js';
 
 const uuid = value => typeof value === 'string' && /^[a-f\d]{8}(-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(value);
 const active = "state IN ('accepted','running','stopping')";
 export class WorkerQueue {
-  constructor(store) { this.store = store; this.db = store.db; }
+  constructor(store, { dailyResumeOffsetSeconds = () => randomInt(0, 8 * 3600 + 1) } = {}) {
+    this.store = store; this.db = store.db;
+    this.dailyResumeOffsetSeconds = dailyResumeOffsetSeconds;
+  }
   now() { return new Date(this.store.clock()).toISOString(); }
   transaction(action) {
     this.db.exec('BEGIN IMMEDIATE');
@@ -68,7 +71,7 @@ export class WorkerQueue {
       const account = this.store.rawAccount(accountId);
       if (account.status !== 'running') throw new AppError(409, 'ACCOUNT_NOT_QUEUED', 'Account chưa được nhấn Run hoặc đã dừng.');
       if (account.available_after && Date.parse(account.available_after) > this.store.clock())
-        throw new AppError(409, 'ACCOUNT_DEFERRED', 'Account đang được tạm hoãn đến ngày mai.');
+        throw new AppError(409, 'ACCOUNT_DEFERRED', 'Account chưa đến lịch chạy lại sau khi đủ KPI trong ngày.');
       this.store.accountProxy(accountId);
       if (this.active(accountId)) throw new AppError(409, 'ACCOUNT_CLAIMED', 'Account đã được Worker khác tiếp nhận.');
       if (this.db.prepare(`SELECT 1 FROM worker_runs WHERE instance_id=? AND ${active}`).get(input.instanceId))
@@ -133,6 +136,7 @@ export class WorkerQueue {
       }
       if (run.state === 'lost') throw new AppError(409, 'LEASE_LOST', 'Lượt chạy đã mất quyền sở hữu.');
       this.db.prepare('UPDATE worker_runs SET state=?,finished_at=? WHERE id=?').run(input.outcome, this.now(), run.id);
+      let availableAfter = null;
       // A fresh Run requested during shutdown stays queued after the previous worker acknowledges stopping.
       if (run.state !== 'stopping') {
         if (input.outcome === 'deferred') {
@@ -142,7 +146,9 @@ export class WorkerQueue {
             vietnamDate.getUTCMonth(),
             vietnamDate.getUTCDate() + 1
           ) - 7 * 3600000;
-          const availableAfter = new Date(nextMidnightUtc).toISOString();
+          // Pick once per completed KPI day, at second precision, including
+          // both 00:00:00 and 08:00:00 in the next Vietnam calendar day.
+          availableAfter = new Date(nextMidnightUtc + this.dailyResumeOffsetSeconds() * 1000).toISOString();
           this.db.prepare('UPDATE accounts SET available_after=?,updated_at=? WHERE id=?')
             .run(availableAfter, this.now(), accountId);
         } else {
@@ -152,7 +158,11 @@ export class WorkerQueue {
       }
       this.event(run, input.outcome === 'failed' ? 'error' : 'info',
         input.outcome === 'deferred'
-          ? `Worker ${workerName} tạm hoãn account đến ngày mai sau khi đạt KPI trong ngày.`
+          ? availableAfter
+            ? `Worker ${workerName} đã đạt KPI trong ngày; account trở lại hàng chờ lúc ${new Intl.DateTimeFormat('vi-VN', {
+              timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'medium', hourCycle: 'h23'
+            }).format(new Date(availableAfter))} (giờ Việt Nam, ngẫu nhiên trong khung 00:00–08:00).`
+            : `Worker ${workerName} đã đạt KPI trong ngày; giữ yêu cầu điều khiển hiện tại của account.`
           : `Worker ${workerName} kết thúc lượt chạy: ${input.outcome}.`);
       return { runId: run.id, state: input.outcome };
     });

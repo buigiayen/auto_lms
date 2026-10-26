@@ -80,6 +80,62 @@ var theorySession = new LotusLmsSession
     DeviceUuid = Guid.NewGuid().ToString(),
     SessionId = Guid.NewGuid().ToString()
 };
+
+await KpiResponseChecks.RunAsync(theorySession, Check);
+await StudyLoggingChecks.RunAsync(theorySession, Check);
+
+// A valid HTTP/JSON response with an unexpected value type must not become a network error.
+using (var responseHandler = new Fixture((_, _) => Task.FromResult(Fixture.Json(new
+{
+    success = true,
+    result = new { today_gained_kpi_time = new { total_gained_kpi_time_in_seconds = "invalid-duration" } }
+}))))
+using (var responseHttp = new HttpClient(responseHandler) { BaseAddress = new Uri("https://lms.invalid") })
+{
+    var responseApi = new LotusLmsApiClient(responseHttp, Options.Create(new LotusLmsOptions { LogApiResponses = false }));
+    try
+    {
+        await responseApi.GetTodayKpiTimeAsync(theorySession, 110);
+        throw new Exception("FAIL: nonnumeric duration fixture should expose a response schema mismatch");
+    }
+    catch (LotusLmsApiException error)
+    {
+        Check(error.StatusCode == HttpStatusCode.OK && error.InnerException is System.Text.Json.JsonException,
+            "response deserialization errors retain HTTP status and JSON cause");
+        var diagnostic = LmsFailureDiagnostics.Describe(error);
+        Check(diagnostic.Contains("HTTP 200") && diagnostic.Contains("JSON") && !diagnostic.Contains('?'),
+            "KPI schema errors are diagnosed as HTTP 200 JSON failures without session queries");
+    }
+}
+
+var timeoutCause = new TaskCanceledException("fixture-secret-message");
+using (var timeoutHandler = new Fixture((_, _) => throw timeoutCause))
+using (var timeoutHttp = new HttpClient(timeoutHandler) { BaseAddress = new Uri("https://lms.invalid") })
+{
+    var timeoutApi = new LotusLmsApiClient(timeoutHttp, Options.Create(new LotusLmsOptions { LogApiResponses = false }));
+    try
+    {
+        await timeoutApi.GetTodayKpiTimeAsync(theorySession, 110);
+        throw new Exception("FAIL: timeout fixture should fail");
+    }
+    catch (LotusLmsApiException error)
+    {
+        Check(ReferenceEquals(error.InnerException, timeoutCause)
+            && LmsFailureDiagnostics.Describe(error).Contains("hết thời gian chờ"),
+            "transport retains timeout cause for worker diagnostics");
+    }
+}
+
+var dnsError = new LotusLmsApiException("fixture-secret-message", "user/login?token=fixture-session-secret",
+    innerException: new HttpRequestException(HttpRequestError.NameResolutionError, "fixture-secret-message",
+        new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound)));
+var dnsDiagnostic = LmsFailureDiagnostics.Describe(dnsError);
+Check(dnsDiagnostic.Contains("NameResolutionError") && dnsDiagnostic.Contains("HostNotFound")
+    && !dnsDiagnostic.Contains("fixture-") && !dnsDiagnostic.Contains('?'),
+    "DNS diagnostics expose error codes while excluding raw exception messages and session query values");
+Check(!LmsFailureDiagnostics.Describe(new LotusLmsApiException("schema failure", "user/login")).Contains("network"),
+    "missing HTTP status alone is not classified as a network failure");
+
 var theoryClient = TheoryClientProxy.Create(minimumSeconds: 1);
 var theoryLogs = new List<string>();
 var theoryService = new TheoryServices(
@@ -202,7 +258,62 @@ using (var transport = new Fixture((request, token) => Task.FromResult(Fixture.J
 using (var client = transport.Client())
     Check(await Fixture.Receiver(client).ReceiveAsync(default) is null, "empty queue waits without claiming");
 
-var proxyAssignmentForClaim = Fixture.Assignment();
+foreach (var credentials in new[] { false, true })
+{
+    var socksProvider = new AccountWebProxyProvider();
+    socksProvider.Apply(new ClientProxy
+    {
+        Enabled = true,
+        Address = "socks5://160.250.166.18:11548",
+        Username = credentials ? "socks-user" : "",
+        Password = credentials ? "socks-secret" : ""
+    }, Fixture.ServerTime);
+    var socks = socksProvider.GetProxy();
+    Check(socks.GetProxy(new Uri("https://lms.invalid")) == new Uri("socks5://160.250.166.18:11548"),
+        "worker preserves SOCKS5 protocol and endpoint");
+    Check(credentials
+        ? socks.Credentials?.GetCredential(new Uri("socks5://160.250.166.18:11548"), "Basic")?.Password == "socks-secret"
+        : socks.Credentials is null, "SOCKS5 supports optional credentials");
+}
+foreach (var address in new[] { "socks5://proxy.invalid", "socks5://proxy.invalid:0", "socks5://proxy.invalid:70000",
+    "socks5://user:secret@proxy.invalid:1080", "socks5://proxy.invalid:1080/path", "socks5://" })
+    Check(!WorkerProxyConfiguration.TryCreateWebProxy(new ClientProxy { Enabled = true, Address = address },
+        Fixture.ServerTime, out _), "worker rejects invalid SOCKS5 endpoint " + address);
+Check(WorkerProxyConfiguration.TryCreateWebProxy(new ClientProxy
+{
+    Enabled = true, Address = "socks5://proxy.invalid:1080:provider-user:provider:secret"
+}, Fixture.ServerTime, out var providerSocks) && providerSocks!.Address!.Scheme == "socks5"
+    && providerSocks.Credentials?.GetCredential(providerSocks.Address, "Basic")?.Password == "provider:secret",
+    "worker supports provider-format SOCKS5 with credentials");
+
+    var providerFormatProxy = new AccountWebProxyProvider();
+    providerFormatProxy.Apply(new ClientProxy
+    {
+        Enabled = true,
+        Address = "proxy.invalid:90:provider-user:provider:secret"
+    }, Fixture.ServerTime);
+    var providerFormatWebProxy = providerFormatProxy.GetProxy();
+    Check(providerFormatWebProxy.GetProxy(new Uri("http://destination.invalid"))?.Host == "proxy.invalid",
+        "worker normalizes provider proxy host and port to an HTTP endpoint");
+    Check(providerFormatWebProxy.Credentials?.GetCredential(
+            new Uri("http://proxy.invalid:90"), "Basic")?.Password == "provider:secret",
+        "worker preserves colons inside provider proxy passwords");
+    Check(!WorkerProxyConfiguration.TryCreateWebProxy(new ClientProxy
+    {
+        Enabled = true,
+        Address = "proxy.invalid:70000:user:secret"
+    }, Fixture.ServerTime, out _),
+        "worker rejects provider proxy ports outside the valid range");
+    var legacyProviderProxy = new AccountWebProxyProvider();
+    legacyProviderProxy.Apply(new ClientProxy
+    {
+        Enabled = true,
+        Address = "https://proxy.invalid:90:provider-user:provider-secret"
+    }, Fixture.ServerTime);
+    Check(legacyProviderProxy.GetProxy().GetProxy(new Uri("http://destination.invalid"))?.Scheme == "https",
+        "worker normalizes legacy scheme-prefixed provider proxy values");
+
+    var proxyAssignmentForClaim = Fixture.Assignment();
 proxyAssignmentForClaim["proxy"] = new JsonObject
 {
     ["id"] = "proxy-1",

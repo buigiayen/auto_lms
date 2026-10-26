@@ -5,10 +5,14 @@ import { fileURLToPath } from 'node:url';
 import { Store } from './store.js';
 import { LmsService, testProxy } from './lms.js';
 import { AppError, pageParams, requireValue } from './errors.js';
+import { AdminAuth } from './auth.js';
 
 const staticFiles = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']], ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
-  ['/styles.css', ['styles.css', 'text/css; charset=utf-8']]
+  ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
+  ['/account-mood.js', ['account-mood.js', 'text/javascript; charset=utf-8']],
+  ['/login', ['login.html', 'text/html; charset=utf-8']],
+  ['/login.js', ['login.js', 'text/javascript; charset=utf-8']]
 ]);
 
 async function readJson(req) {
@@ -31,16 +35,26 @@ export function createApp({
   lmsOptions,
   proxyTester = testProxy,
   clock,
-  workerRegistrationKey = process.env.WORKER_REGISTRATION_KEY
+  workerRegistrationKey = process.env.WORKER_REGISTRATION_KEY,
+  allowedHosts = (process.env.CLIENT_ALLOWED_HOSTS || '').split(','),
+  // Embedding tests can supply null; the server entrypoint always requires auth.
+  adminAuth = {
+    username: process.env.CLIENT_USERNAME,
+    password: process.env.CLIENT_PASSWORD,
+    secureCookies: process.env.CLIENT_SESSION_SECURE === 'true'
+  }
 } = {}) {
   if (workerRegistrationKey && workerRegistrationKey.length < 32)
     throw new Error('WORKER_REGISTRATION_KEY phải có ít nhất 32 ký tự.');
+  const auth = adminAuth === null ? null : new AdminAuth({ ...adminAuth, clock: clock || Date.now });
   const store = new Store(directory, { clock }), lms = new LmsService(store, lmsOptions);
+  const acceptedHosts = new Set(['localhost', '127.0.0.1', '[::1]', process.env.CLIENT_HOST,
+    ...allowedHosts.map(host => host.trim()).filter(Boolean)]);
   const server = createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'");
     const send = (status, value) => {
       res.statusCode = status;
       if (value === undefined) { res.end(); return; }
@@ -48,21 +62,35 @@ export function createApp({
     };
     try {
       const host = new URL(`http://${req.headers.host}`).hostname;
-      if (!['localhost', '127.0.0.1', '[::1]', process.env.CLIENT_HOST].includes(host))
+      if (!acceptedHosts.has(host))
         throw new AppError(403, 'HOST_NOT_ALLOWED', 'Hostname truy cập không được cho phép.');
       const uri = new URL(req.url, 'http://localhost');
       const path = uri.pathname, method = req.method;
-      if (req.headers.origin && !req.url.startsWith('/api/worker/')) {
+      if (req.headers.origin && !path.startsWith('/api/worker/')) {
         requireValue(req.headers.origin === `http://${req.headers.host}` || req.headers.origin === `https://${req.headers.host}`, 'Origin không hợp lệ.');
       }
+      if (path === '/api/auth/session' && method === 'GET') {
+        const session = auth?.session(req);
+        send(200, { data: { authenticated: !auth || Boolean(session), username: session?.username || null } }); return;
+      }
+      if (path === '/api/auth/login' && method === 'POST') {
+        const input = await readJson(req);
+        send(200, { data: auth ? auth.login(req, res, input) : { authenticated: true } }); return;
+      }
+      if (path === '/api/auth/logout' && method === 'POST') {
+        auth?.logout(req, res); send(204); return;
+      }
+      if (method === 'GET' && auth &&
+          ((path === '/' && !auth.session(req)) || (path === '/login' && auth.session(req)))) {
+        res.statusCode = 302;
+        res.setHeader('Location', path === '/' ? '/login' : '/'); res.end(); return;
+      }
       if (method === 'GET' && staticFiles.has(path)) {
+        if (path === '/app.js') auth?.requireSession(req);
         const [file, type] = staticFiles.get(path);
         res.setHeader('Content-Type', type); res.end(readFileSync(new URL(`../public/${file}`, import.meta.url))); return;
       }
       if (path === '/api/health' && method === 'GET') { send(200, { data: { status: 'ok', storage: 'sqlite' } }); return; }
-      if (path === '/api/accounts' && method === 'GET') { send(200, store.listAccounts(uri.searchParams, pageParams(uri.searchParams))); return; }
-      if (path === '/api/accounts' && method === 'POST') { send(201, { data: store.saveAccount(await readJson(req)) }); return; }
-      if (path === '/api/logs' && method === 'GET') { send(200, store.logs(null, uri.searchParams, pageParams(uri.searchParams, 50))); return; }
       if (path === '/api/workers' && method === 'POST') {
         if (!workerRegistrationKey) throw new AppError(503, 'WORKER_REGISTRATION_DISABLED', 'Chưa cấu hình WORKER_REGISTRATION_KEY trên Client API.');
         const authorization = req.headers.authorization ?? '';
@@ -101,6 +129,12 @@ export function createApp({
           send(200, { data: store.queue.controlData(store.queue.verify(id, worker, input)) }); return;
         }
       }
+      const workerAccountRead = method === 'GET' && /^\/api\/accounts\/[^/]+$/.test(path) && req.headers.authorization;
+      const workerProxyRead = method === 'GET' && /^\/api\/proxies\/[^/]+$/.test(path) && req.headers.authorization;
+      if (!workerAccountRead && !workerProxyRead) auth?.requireSession(req);
+      if (path === '/api/accounts' && method === 'GET') { send(200, store.listAccounts(uri.searchParams, pageParams(uri.searchParams))); return; }
+      if (path === '/api/accounts' && method === 'POST') { send(201, { data: store.saveAccount(await readJson(req)) }); return; }
+      if (path === '/api/logs' && method === 'GET') { send(200, store.logs(null, uri.searchParams, pageParams(uri.searchParams, 50))); return; }
       if (path === '/api/proxies') {
         if (method === 'GET') { send(200, { data: store.listProxies({ availableOnly: uri.searchParams.get('available') === 'true' }) }); return; }
         if (method === 'POST') { send(201, { data: store.saveProxy(await readJson(req)) }); return; }
@@ -142,7 +176,10 @@ export function createApp({
       const match = path.match(/^\/api\/accounts\/([^/]+)(.*)$/);
       if (match) {
         const [, id, action] = match;
-        if (!action && method === 'GET') { send(200, { data: store.account(id) }); return; }
+        if (!action && method === 'GET') {
+          if (workerAccountRead) store.checkWorker(id, store.workerForToken(req.headers.authorization));
+          send(200, { data: store.account(id) }); return;
+        }
         if (!action && method === 'PATCH') {
           const input = await readJson(req), data = store.saveAccount(input, id);
           if (Object.keys(input).some(key => key !== 'managingTeacher')) lms.invalidate(id);

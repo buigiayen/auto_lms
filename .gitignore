@@ -89,6 +89,7 @@ StyleCopReport.xml
 
 # Environment files (contains secrets — do NOT commit)
 .env
+deploys/backups/
 /LotusLMS.Worker.V2/appsettings.Development.json
 .lotuslms/
 

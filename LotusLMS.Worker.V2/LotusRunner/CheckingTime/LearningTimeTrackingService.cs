@@ -109,12 +109,21 @@ public sealed class LearningTimeTrackingService(
             autoStudies.Add(autoStudy);
         }
 
-        string NotiMessage = @$" {DateTime.Now} 
+        string NotiMessage = @$" {DateTime.Now}
                                 -- Theo phân tích số bài học cần phải thực hiện là 
                                 -- trong đó có ôn luyện còn {practiceNotPass.Count()}/{listCourse.Count()}
                                 -- trong đó có Lý thuyết tự học còn {TheoryIsNotPass.Count()}/{listCourse.Count() - 1}
                                 -- Trong đó kiểm tra còn {exam.Count()}/{listCourse.Count()}";
         logger.LogInformation(NotiMessage);
+
+        var groupedItems = autoStudies.GroupBy(item =>
+            (Course: item.iidRoot, Item: item.iid, Type: item.typeAutoStudy, Ntype: item.ntype)).ToList();
+        logger.LogInformation("PLAN_READ plan={PlanIid} entries={Entries} unique={UniqueEntries}",
+            IID_enrolment_plan, autoStudies.Count, groupedItems.Count);
+        foreach (var duplicate in groupedItems.Where(group => group.Count() > 1))
+            logger.LogWarning(
+                "PLAN_DUPLICATE plan={PlanIid} course={CourseIid} item={ItemIid} type={StudyType} rows={Rows}",
+                IID_enrolment_plan, duplicate.Key.Course, duplicate.Key.Item, duplicate.Key.Type, duplicate.Count());
 
         await sendClientLog(NotiMessage, token);
         return new StudyPlan(autoStudies, IsCompleted: false);

@@ -63,6 +63,9 @@ public sealed class TheoryServices(
                             $"Theory item {plannedItem.iid} was not returned for course {courseIid}.");
                     }
 
+                    logger.LogInformation(
+                        "THEORY_SELECT course={CourseIid} item={ItemIid} name={ItemName} progress={Actual}/{Required}s",
+                        courseIid, node.Iid, plannedItem.name, node.ActualLearningTime, node.MinLearningTime);
                     if (node.MinLearningTime <= 0 || node.IsSuccessLearningTime)
                     {
                         continue;
@@ -81,6 +84,12 @@ public sealed class TheoryServices(
                             timeProvider,
                             cancellationToken);
 
+                        var saveId = Guid.NewGuid().ToString("N");
+                        var previousActualLearningTime = current.ActualLearningTime;
+                        logger.LogInformation(
+                            "THEORY_SEND sendId={SendId} course={CourseIid} item={ItemIid} seq={Sequence} seconds={Seconds} before={Before}/{Required}s",
+                            saveId, courseIid, current.Iid, saves + 1, secondsToSave,
+                            previousActualLearningTime, current.MinLearningTime);
                         await client.SaveItemLearningTimeAsync(
                             session,
                             new SaveItemLearningTimeRequest
@@ -93,8 +102,10 @@ public sealed class TheoryServices(
                             cancellationToken);
                         saves++;
                         savedThisPass++;
+                        logger.LogInformation(
+                            "THEORY_ACK sendId={SendId} course={CourseIid} item={ItemIid} seq={Sequence}",
+                            saveId, courseIid, current.Iid, saves);
 
-                        var previousActualLearningTime = current.ActualLearningTime;
                         var refreshedDetails = await client.GetDetailLearningTimeAsync(
                             session,
                             courseIid,
@@ -112,11 +123,9 @@ public sealed class TheoryServices(
                         }
 
                         logger.LogInformation(
-                            "Lý thuyết {ItemName} ({ItemIid}): {Actual}/{Required} giây.",
-                            plannedItem.name,
-                            current.Iid,
-                            current.ActualLearningTime,
-                            current.MinLearningTime);
+                            "THEORY_PROGRESS sendId={SendId} course={CourseIid} item={ItemIid} before={Before} after={Actual} required={Required}s",
+                            saveId, courseIid, current.Iid, previousActualLearningTime,
+                            current.ActualLearningTime, current.MinLearningTime);
 
                         if (workerOptions.Value.StopOnDailyKpi
                             && saves % workerOptions.Value.KpiCheckEverySaves == 0)
@@ -145,7 +154,7 @@ public sealed class TheoryServices(
                         }
                     }
 
-                    var completedMessage = $"Đã hoàn thành bài lý thuyết: {plannedItem.name}.";
+                    var completedMessage = $"Đã hoàn thành bài lý thuyết: {plannedItem.name} (course={courseIid} item={current.Iid}).";
                     logger.LogInformation("{Message}", completedMessage);
                     await sendClientLog(completedMessage, cancellationToken);
                 }

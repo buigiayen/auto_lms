@@ -46,7 +46,7 @@ test('atomic claims from independent SQLite connections prevent duplicate studen
 
 test('queue API enforces ownership, heartbeat expiry, stop/restart, per-run logs and credential isolation', async () => {
   const directory = temp(); let time = Date.parse('2040-01-01T00:00:00Z');
-  const app = createApp({ directory, clock: () => time, workerRegistrationKey: 'fixture-registration-key-0123456789abcdef' });
+  const app = createApp({ adminAuth: null, directory, clock: () => time, workerRegistrationKey: 'fixture-registration-key-0123456789abcdef' });
   await new Promise(resolve => app.server.listen(0,'127.0.0.1',resolve));
   const origin = `http://127.0.0.1:${app.server.address().port}`;
   const call = async (path, method='GET', body, workerName) => {
@@ -118,10 +118,12 @@ test('queue API enforces ownership, heartbeat expiry, stop/restart, per-run logs
   } finally {await app.close();rmSync(directory,{recursive:true});}
 });
 
-test('daily KPI deferral keeps accounts Treo, frees the lane and resumes at Vietnam midnight', () => {
+test('daily KPI deferral persists one random resume time, frees the lane and respects that time', () => {
   const directory = temp();
   let time = Date.parse('2040-01-01T12:00:00Z');
-  const store = new Store(directory, { clock: () => time });
+  let selections = 0;
+  const options = { clock: () => time, dailyResumeOffsetSeconds: () => { selections++; return 6 * 3600; } };
+  let store = new Store(directory, options);
   try {
     const deferredAccount = store.saveAccount(accountInput);
     const otherAccount = store.saveAccount({ ...accountInput, identityNumber: '000000000002' });
@@ -134,21 +136,43 @@ test('daily KPI deferral keeps accounts Treo, frees the lane and resumes at Viet
     assert.equal(finished.state, 'deferred');
     assert.equal(store.account(deferredAccount.id).status, 'running');
     assert.equal(store.account(deferredAccount.id).execution.state, 'deferred');
-    assert.equal(store.account(deferredAccount.id).execution.availableAfter, '2040-01-01T17:00:00.000Z');
+    const resumeAt = '2040-01-01T23:00:00.000Z'; // 06:00 next day in Vietnam.
+    assert.equal(store.account(deferredAccount.id).execution.availableAfter, resumeAt);
+    assert.equal(selections, 1);
+    store.queue.finish(deferredAccount.id, 'lane-01', { ...ownership(run), outcome: 'deferred' });
+    assert.equal(selections, 1, 'retrying finish must not pick a new time');
+    const deferredLog = store.db.prepare('SELECT message FROM worker_logs WHERE run_id=? ORDER BY id DESC LIMIT 1').get(run.runId).message;
+    assert.match(deferredLog, /06:00:00/);
+    assert.match(deferredLog, /00:00–08:00/);
+    store.close();
+    store = new Store(directory, options);
+    assert.equal(store.account(deferredAccount.id).execution.availableAfter, resumeAt, 'schedule survives restart');
+    assert.equal(selections, 1, 'reading a persisted schedule must not reroll it');
     assert.deepEqual(
       store.queue.available(new URLSearchParams(), { page: 1, pageSize: 20, offset: 0 }).data.map(a => a.id).sort(),
       [otherAccount.id].sort(),
       'the lane can claim other accounts while this account is deferred'
     );
 
-    time = Date.parse('2040-01-01T17:00:00Z');
+    time = Date.parse(resumeAt) - 1;
+    assert.equal(store.account(deferredAccount.id).execution.state, 'deferred');
+    assert.throws(() => store.queue.claim(deferredAccount.id, 'lane-01', claimInput('lane-01')),
+      error => error.code === 'ACCOUNT_DEFERRED', 'direct claim cannot bypass the schedule');
+    assert.deepEqual(
+      store.queue.available(new URLSearchParams(), { page: 1, pageSize: 20, offset: 0 }).data.map(a => a.id),
+      [otherAccount.id], 'account stays hidden until its chosen second'
+    );
+    time = Date.parse(resumeAt);
     assert.deepEqual(
       store.queue.available(new URLSearchParams(), { page: 1, pageSize: 20, offset: 0 }).data.map(a => a.id).sort(),
       [deferredAccount.id, otherAccount.id].sort(),
-      'the deferred account becomes available at midnight UTC+7'
+      'the deferred account becomes available exactly at its scheduled time'
     );
 
-    time = Date.parse('2040-01-01T12:00:00Z');
+    const nextRun = store.queue.claim(deferredAccount.id, 'lane-01', claimInput('lane-01'));
+    store.queue.finish(deferredAccount.id, 'lane-01', { ...ownership(nextRun), outcome: 'deferred' });
+    assert.equal(selections, 2, 'a new KPI day gets a new random selection');
+    assert.equal(store.account(deferredAccount.id).execution.availableAfter, '2040-01-02T23:00:00.000Z');
     store.setStatus(deferredAccount.id, 'running');
     assert.equal(store.account(deferredAccount.id).execution.state, 'queued');
     assert.ok(store.queue.available(new URLSearchParams(), { page: 1, pageSize: 20, offset: 0 })
@@ -157,6 +181,43 @@ test('daily KPI deferral keeps accounts Treo, frees the lane and resumes at Viet
     store.close();
     rmSync(directory, { recursive: true });
   }
+});
+
+test('daily KPI scheduling includes 00:00 and 08:00 and follows Vietnam calendar boundaries', () => {
+  const cases = [
+    ['2040-01-01T16:59:59.999Z', '2040-01-01T17:00:00.000Z'], // 23:59 Vietnam.
+    ['2040-01-01T17:00:00.000Z', '2040-01-02T17:00:00.000Z'], // 00:00 Vietnam.
+    ['2040-01-31T12:00:00.000Z', '2040-01-31T17:00:00.000Z'], // Month rollover.
+    ['2040-02-28T17:00:00.000Z', '2040-02-29T17:00:00.000Z'], // Leap day -> March.
+    ['2040-12-31T12:00:00.000Z', '2040-12-31T17:00:00.000Z'], // Year rollover.
+  ];
+  for (const [now, nextMidnight] of cases) for (const seconds of [0, 8 * 3600]) {
+    const directory = temp();
+    const store = new Store(directory, { clock: () => Date.parse(now), dailyResumeOffsetSeconds: () => seconds });
+    try {
+      const account = store.saveAccount(accountInput);
+      const run = store.queue.claim(account.id, 'lane-01', claimInput('lane-01'));
+      store.queue.finish(account.id, 'lane-01', { ...ownership(run), outcome: 'deferred' });
+      assert.equal(store.account(account.id).execution.availableAfter,
+        new Date(Date.parse(nextMidnight) + seconds * 1000).toISOString(), `${now}, offset ${seconds}s`);
+    } finally { store.close(); rmSync(directory, { recursive: true }); }
+  }
+});
+
+test('default daily KPI scheduler chooses a persisted time inside the next Vietnam morning', () => {
+  const directory = temp(), time = Date.parse('2040-05-10T20:00:00Z'); // May 11 in Vietnam.
+  const store = new Store(directory, { clock: () => time });
+  try {
+    for (let index = 1; index <= 3; index++) {
+      const account = store.saveAccount({ ...accountInput, identityNumber: String(index).padStart(12, '0') });
+      const run = store.queue.claim(account.id, 'lane-01', claimInput('lane-01'));
+      store.queue.finish(account.id, 'lane-01', { ...ownership(run), outcome: 'deferred' });
+      const resumeAt = Date.parse(store.account(account.id).execution.availableAfter);
+      assert.ok(resumeAt >= Date.parse('2040-05-11T17:00:00Z'));
+      assert.ok(resumeAt <= Date.parse('2040-05-12T01:00:00Z'));
+      assert.equal(resumeAt % 1000, 0, 'schedules use whole seconds');
+    }
+  } finally { store.close(); rmSync(directory, { recursive: true }); }
 });
 
 test('schema upgrade preserves old accounts and logs and backs up before adding run IDs', () => {

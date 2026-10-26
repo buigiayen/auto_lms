@@ -9,10 +9,26 @@ modal đọc response LMS raw.
 Yêu cầu Node.js 24 trở lên. Từ thư mục repository:
 
 ```bash
+cp .env.example .env
+# Đặt CLIENT_USERNAME và CLIENT_PASSWORD trong .env.
 cd client
 npm ci
 npm start
 ```
+
+`npm start` và `npm run dev` tự đọc `.env` ở thư mục gốc repository; biến môi
+trường có sẵn được ưu tiên. Client yêu cầu `CLIENT_USERNAME` và `CLIENT_PASSWORD`
+không rỗng khi khởi động. Không có tài khoản/mật khẩu đăng nhập mặc định.
+Mở giao diện sẽ vào màn hình đăng nhập; backend đối chiếu hai giá trị này và
+cấp phiên 12 giờ bằng cookie HttpOnly/SameSite=Strict. Nút **Đăng xuất** hủy
+phiên ngay. Restart server hoặc đổi thông tin trong `.env` rồi restart sẽ yêu
+cầu đăng nhập lại. Đặt `CLIENT_SESSION_SECURE=true` khi truy cập bằng HTTPS;
+để `false` với localhost/SSH tunnel/HTTP trong mạng riêng.
+
+Giao diện và API quản trị cùng yêu cầu đăng nhập. Worker tiếp tục dùng khóa
+bootstrap/API key riêng; không cần user/pass quản trị. Các kiểm tra nghiệp vụ
+cũ có thể truyền `adminAuth: null` trực tiếp cho factory `createApp` trong
+fixture; entrypoint và Docker luôn dùng cấu hình đăng nhập bắt buộc từ môi trường.
 
 Mở `http://127.0.0.1:3100`. `npm run dev` dùng chế độ watch; `npm test` chạy kiểm
 thử offline, `npm run check` kiểm tra cú pháp. Dữ liệu được tạo tự động ở
@@ -32,7 +48,7 @@ hiện tại của repository. Proxy được nhập và lưu trên trang “C�
 | Thay đổi trạng thái | Chuyển giữa “Treo” và “Dừng treo” |
 | Nhận log worker | Worker gửi log về backend, SQLite lưu theo tài khoản |
 | Xem chi tiết tài khoản | Đăng nhập LMS, chọn chương trình học, hiển thị response danh sách khóa học dạng JSON trong modal |
-| Cấu hình proxy | Lưu nhiều proxy HTTP/HTTPS, kiểm tra IP và chọn một cấu hình cho từng account |
+| Cấu hình proxy | Lưu nhiều proxy HTTP/HTTPS/SOCKS5, kiểm tra IP và chọn một cấu hình cho từng account |
 | Bảng quản lý account | Tìm kiếm, lọc, phân trang; tạo, sửa, chọn proxy, đổi trạng thái, mở chi tiết và xem log |
 
 ## Kiến trúc
@@ -74,7 +90,17 @@ dùng [`undici ProxyAgent`](https://github.com/nodejs/undici/blob/main/docs/docs
 
 ## Chọn proxy cho từng account
 
-1. Vào **Cấu hình proxy** → **Thêm**, nhập tên, host/port, thông tin xác thực và ngày hết hạn (nếu có), bật rồi lưu.
+1. Vào **Cấu hình proxy** → **Thêm**. Có thể dán chuỗi nhà cung cấp
+   `host:port:username:password` vào **Nhập nhanh từ nhà cung cấp** rồi nhấn
+   **Tách thông tin proxy**, hoặc nhập host/port và thông tin xác thực riêng.
+   Chuỗi không có giao thức được chuẩn hóa thành HTTP và lưu URL cùng thông tin xác thực riêng.
+   Với SOCKS5, chọn giao thức **SOCKS5**, nhập Host và **SocksPort** của nhà cung cấp;
+   có thể dán trực tiếp `socks5://160.250.166.18:11548` rồi tách thông tin.
+   Để trống username/password nếu không cần xác thực. Client và Worker đều dùng
+   SOCKS5 cho kết nối LMS; tên miền đích được phân giải qua proxy.
+   Với IPv6, đặt địa chỉ trong ngoặc vuông, ví dụ
+   `[2001:db8::1]:8080:user:pass`; dấu `:` trong mật khẩu được giữ nguyên.
+   Nhập ngày hết hạn (nếu có), bật rồi lưu.
 2. Vào **Tài khoản** → **Sửa** (hoặc thêm account mới).
 3. Chọn cấu hình trong trường **Proxy** → **Lưu thay đổi**.
 
@@ -107,6 +133,31 @@ transport dùng lại cho ứng dụng .NET khác. Worker đã dùng thư viện
 account, heartbeat, log và finish. Không đổi API backend hoặc dữ liệu SQLite.
 
 ## Kết nối Worker .NET và nhận học viên
+
+### Chạy Client và Worker V2 bằng Docker Compose
+
+Để deploy trên server bằng image có sẵn từ GHCR, dùng bộ Compose độc lập và
+hướng dẫn trong [`deploys/README.md`](../deploys/README.md). Workflow
+[`publish-images.yml`](../.github/workflows/publish-images.yml) kiểm tra,
+build và publish image client/worker cho Linux amd64 và arm64.
+
+Trong thư mục gốc repo, tạo file cấu hình, thay bootstrap key bằng giá trị được
+tạo ở mục **Worker & khóa**, rồi build và chạy hai service:
+
+```bash
+cp .env.example .env
+openssl rand -hex 32
+# Dán kết quả vào WORKER_REGISTRATION_KEY trong .env
+# Đặt CLIENT_USERNAME và CLIENT_PASSWORD cho màn hình đăng nhập.
+docker compose build
+docker compose up -d
+```
+
+Mở giao diện tại `http://127.0.0.1:3100`. Đổi cổng bằng `CLIENT_PORT` trong
+`.env`. Client lưu SQLite và API key lane trong Docker volume
+`lotuslms-client-data`; `docker compose down` không xóa volume này. Không commit
+`.env`. Sau khi thay bootstrap key, cập nhật biến đó rồi tạo lại container bằng
+`docker compose up -d --force-recreate`.
 
 Sau khi nhấn **Run/Treo**, account vào hàng chờ. Worker gọi API danh sách, chọn
 một học viên rồi xác nhận nhận việc. Backend khóa account trong SQLite và ghi

@@ -4,6 +4,8 @@
 
 # Secrets must never end up in the build context
 .env
+**/.env
+deploys/backups/
 **/.lotuslms/
 client/data/
 client/node_modules/

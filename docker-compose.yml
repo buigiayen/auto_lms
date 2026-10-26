@@ -1,45 +1,53 @@
 services:
-  lotuslms-worker:
+  client:
     build:
       context: .
-      dockerfile: Dockerfile
-    image: buiyenit/lotuslms-worker:latest
-    platform: ${DOCKER_PLATFORM:-linux/amd64}
-    container_name: ${LOTUSLMS_USERNAME}
-    restart: "no"
+      dockerfile: Dockerfile.client
+    image: lotuslms-client:local
+    restart: unless-stopped
     environment:
-      # Worker mode: ReadOnlyProbe (safe) | AutoStudy (real writes) | Idle
-      Worker__Mode: ${WORKER_MODE:-ReadOnlyProbe}
-
-      # Account (required)
-      LotusLmsCredentials__Username: ${LOTUSLMS_USERNAME:-}
-      LotusLmsCredentials__Password: ${LOTUSLMS_PASSWORD:-}
-
-      # Request context (matches the web client)
-      LotusLmsCredentials__ClientSyncToken: ${LOTUSLMS_CLIENT_SYNC_TOKEN:-}
-      LotusLmsCredentials__RequestId: ${LOTUSLMS_REQUEST_ID:-}
-      LotusLmsCredentials__RequestToken: ${LOTUSLMS_REQUEST_TOKEN:-}
-      LotusLmsCredentials__StudentRequestId: ${LOTUSLMS_STUDENT_REQUEST_ID:-}
-      LotusLmsCredentials__StudentRequestToken: ${LOTUSLMS_STUDENT_REQUEST_TOKEN:-}
-
-      # Optional overrides; blank uses a persisted device UUID and a fresh session ID.
-      LotusLmsCredentials__DeviceUuid: ${LOTUSLMS_DEVICE_UUID:-}
-      LotusLmsCredentials__SessionId: ${LOTUSLMS_SESSION_ID:-}
-
-      # One JSONL response file per API URI path.
-      LotusLms__LogApiResponses: ${LOG_API_RESPONSES:-true}
-      LotusLms__ApiResponseLogDirectory: ${API_RESPONSE_LOG_DIRECTORY:-logs/api-responses}
-
-      # Proxy (disabled by default)
-      Http__Proxy__Enabled: ${PROXY_ENABLED:-false}
-      Http__Proxy__Address: ${PROXY_ADDRESS:-}
-      Http__Proxy__Username: ${PROXY_USERNAME:-}
-      Http__Proxy__Password: ${PROXY_PASSWORD:-}
-      Http__Proxy__Domain: ${PROXY_DOMAIN:-}
-      Http__Proxy__BypassOnLocal: ${PROXY_BYPASS_ON_LOCAL:-true}
-      Http__Proxy__UseDefaultCredentials: ${PROXY_USE_DEFAULT_CREDENTIALS:-false}
-
-      Logging__LogLevel__LotusLMS.Worker.LotusLmsAutoStudy: Debug
+      PORT: 3100
+      CLIENT_HOST: client
+      CLIENT_LISTEN_HOST: 0.0.0.0
+      CLIENT_DATA_DIR: /app/data
+      CLIENT_USERNAME: "${CLIENT_USERNAME:?Set CLIENT_USERNAME in .env}"
+      CLIENT_PASSWORD: "${CLIENT_PASSWORD:?Set CLIENT_PASSWORD in .env}"
+      CLIENT_SESSION_SECURE: "${CLIENT_SESSION_SECURE:-false}"
+      WORKER_REGISTRATION_KEY: "${WORKER_REGISTRATION_KEY:?Set WORKER_REGISTRATION_KEY in .env}"
+    ports:
+      - "127.0.0.1:${CLIENT_PORT:-3100}:3100"
     volumes:
-      - ./logs/api-responses:/app/logs/api-responses
-      - ./.lotuslms:/app/.lotuslms
+      - lotuslms-client-data:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3100/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker-v2
+    image: lotuslms-worker-v2:local
+    restart: unless-stopped
+    depends_on:
+      client:
+        condition: service_healthy
+    environment:
+      Client__BaseUrl: http://client:3100
+      Client__RequestTimeoutSeconds: ${CLIENT_REQUEST_TIMEOUT_SECONDS:-10}
+      Worker__WorkerName: ${WORKER_NAME:-worker-v2}
+      Worker__MaxConcurrentAccounts: ${MAX_CONCURRENT_ACCOUNTS:-5}
+      Worker__RegistrationApiKey: "${WORKER_REGISTRATION_KEY:?Set WORKER_REGISTRATION_KEY in .env}"
+      Worker__PollIntervalSeconds: ${POLL_INTERVAL_SECONDS:-5}
+      Worker__HeartbeatIntervalSeconds: ${HEARTBEAT_INTERVAL_SECONDS:-5}
+      Worker__StopOnDailyKpi: ${STOP_ON_DAILY_KPI:-false}
+      Worker__IncludePractice: ${INCLUDE_PRACTICE:-false}
+
+volumes:
+  lotuslms-client-data:

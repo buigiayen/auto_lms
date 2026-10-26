@@ -61,6 +61,9 @@ Mutation calls are deliberately not retried by the library. If a timeout occurs
 after a request may have reached the server, the worker must read the server state
 and reconcile before sending another increment.
 
+Daily KPI durations use `double` seconds and accept JSON numbers or numeric
+strings, retaining fractional elapsed time for progress and completion checks.
+
 `GetQuestionBankStatusAsync` uses POST with `bank_iids[]`,
 `exam_template_iid`, `last_ts=0`, and `lang=vn` in the query, matching the
 supplied HAR. Detail and bank requests use multipart bodies as well.

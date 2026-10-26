@@ -1,0 +1,16 @@
+FROM node:24-alpine
+WORKDIR /app
+
+COPY client/package.json client/package-lock.json ./
+RUN npm ci --omit=dev
+
+COPY client/src ./src
+COPY client/docs ./docs
+RUN mkdir -p /app/data && chown -R node:node /app
+
+ENV NODE_ENV=production
+ENV PORT=3100
+USER node
+
+EXPOSE 3100
+CMD ["npm", "start"]

@@ -18,9 +18,11 @@ internal sealed class WebProxyOptionsValidator : IValidateOptions<WebProxyOption
             failures.Add($"{WebProxyOptions.SectionName}:Address is required when the proxy is enabled.");
         }
         else if (!Uri.TryCreate(options.Address, UriKind.Absolute, out var address)
-                 || (address.Scheme != Uri.UriSchemeHttp && address.Scheme != Uri.UriSchemeHttps))
+                 || address.Scheme is not ("http" or "https" or "socks5")
+                 || string.IsNullOrWhiteSpace(address.Host)
+                 || address.Port is < 1 or > 65535)
         {
-            failures.Add($"{WebProxyOptions.SectionName}:Address must be an absolute HTTP or HTTPS URI.");
+            failures.Add($"{WebProxyOptions.SectionName}:Address must be an absolute HTTP, HTTPS or SOCKS5 URI with a valid port.");
         }
 
         var hasUsername = !string.IsNullOrWhiteSpace(options.Username);

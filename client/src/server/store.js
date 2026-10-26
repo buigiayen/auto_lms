@@ -5,6 +5,7 @@ import { randomUUID, randomBytes, createCipheriv, createDecipheriv, timingSafeEq
 import { AppError, requireValue } from './errors.js';
 import { isProxyExpired, proxyExpiresAt } from './proxy-expiry.js';
 import { WorkerQueue } from './worker-queue.js';
+import { accountMood } from '../public/account-mood.js';
 
 const providers = ['yenthuy', 'truongson'];
 const now = () => new Date().toISOString();
@@ -14,6 +15,19 @@ function canonical(value) {
   if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map(key =>
     [key, /password|token|cookie|authorization/i.test(key) ? '[redacted]' : canonical(value[key])]));
   return value;
+}
+function parseProviderProxyAddress(address) {
+  const scheme = address.match(/^(https?|socks5):\/\//i);
+  const raw = scheme ? address.slice(scheme[0].length) : address;
+  const match = raw.startsWith('[')
+    ? raw.match(/^(\[[^\]]+\]):(\d+):([^:]+):(.*)$/)
+    : raw.match(/^([^:]+):(\d+):([^:]+):(.*)$/);
+  if (!match) return null;
+  const port = Number(match[2]);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
+  const host = match[1].trim(), username = match[3].trim();
+  if (!host || !username) return null;
+  return { address: `${scheme?.[1].toLowerCase() ?? 'http'}://${host}:${port}`, username, password: match[4] };
 }
 const publicAccount = (row, at) => ({
   id: row.id, identityNumber: row.identity_number, provider: row.provider,
@@ -27,7 +41,7 @@ const publicAccount = (row, at) => ({
 });
 
 export class Store {
-  constructor(directory, { clock = Date.now } = {}) {
+  constructor(directory, { clock = Date.now, dailyResumeOffsetSeconds } = {}) {
     this.clock = clock;
     this.directory = directory;
     mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -70,7 +84,7 @@ export class Store {
     }
     this.migrateWorkerDeferral();
     this.db.exec('PRAGMA user_version=8');
-    this.queue = new WorkerQueue(this);
+    this.queue = new WorkerQueue(this, { dailyResumeOffsetSeconds });
     this.workerKeyFile = join(directory, 'worker-api-keys.json');
     this.workerKeys = Object.assign(Object.create(null), existsSync(this.workerKeyFile) ? JSON.parse(readFileSync(this.workerKeyFile, 'utf8')) : {});
   }
@@ -205,6 +219,8 @@ export class Store {
 
   listAccounts(query, paging) {
     this.queue.reap();
+    const mood = query.get('mood');
+    requireValue(!mood || ['sleeping', 'awake', 'celebrating', 'angry'].includes(mood), 'Bộ lọc không hợp lệ.', 'mood');
     const clauses = [], params = [];
     for (const [field, column, allowed] of [['provider', 'provider', providers], ['status', 'status', ['running', 'stopped']]]) {
       if (query.get(field)) {
@@ -218,10 +234,17 @@ export class Store {
       params.push(term, term);
     }
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-    const total = this.db.prepare(`SELECT count(*) AS total FROM accounts a ${where}`).get(...params).total;
-    const data = this.db.prepare(`SELECT a.*,p.name proxy_name,p.address proxy_address,p.enabled proxy_enabled,p.expires_on proxy_expires_on
-      FROM accounts a LEFT JOIN proxies p ON p.id=a.proxy_id ${where} ORDER BY a.created_at DESC, a.id LIMIT ? OFFSET ?`)
-      .all(...params, paging.pageSize, paging.offset).map(row => ({ ...publicAccount(row, this.clock()), execution: this.queue.execution(row) }));
+    let total = this.db.prepare(`SELECT count(*) AS total FROM accounts a ${where}`).get(...params).total;
+    let data = this.db.prepare(`SELECT a.*,p.name proxy_name,p.address proxy_address,p.enabled proxy_enabled,p.expires_on proxy_expires_on
+      FROM accounts a LEFT JOIN proxies p ON p.id=a.proxy_id ${where} ORDER BY a.created_at DESC, a.id ${mood ? '' : 'LIMIT ? OFFSET ?'}`)
+      .all(...params, ...(mood ? [] : [paging.pageSize, paging.offset]))
+      .map(row => ({ ...publicAccount(row, this.clock()), execution: this.queue.execution(row) }));
+    if (mood) {
+      // Match the displayed mood before paginating, including current-run errors.
+      data = data.filter(account => accountMood(account) === mood);
+      total = data.length;
+      data = data.slice(paging.offset, paging.offset + paging.pageSize);
+    }
     const summary = this.db.prepare(`SELECT count(*) total, coalesce(sum(status='running'),0) running,
       coalesce(sum(status='stopped'),0) stopped, count(DISTINCT worker_name) workers FROM accounts`).get();
     summary.workers = this.db.prepare("SELECT count(DISTINCT instance_id) total FROM worker_runs WHERE state IN ('accepted','running','stopping')").get().total;
@@ -388,10 +411,14 @@ export class Store {
     const name = typeof input.name === 'string' ? input.name.trim() : '';
     requireValue(name.length > 0 && name.length <= 100, 'Tên cấu hình dài từ 1–100 ký tự.', 'name');
     requireValue(typeof input.enabled === 'boolean', 'Chọn trạng thái proxy.', 'enabled');
-    const address = typeof input.address === 'string' ? input.address.trim() : '';
-    const username = typeof input.username === 'string' ? input.username.trim() : '';
-    requireValue(!(input.clearPassword && own(input, 'password')), 'Không thể vừa xóa vừa đặt mật khẩu.', 'password');
+    const enteredAddress = typeof input.address === 'string' ? input.address.trim() : '';
+    const providerProxy = enteredAddress ? parseProviderProxyAddress(enteredAddress) : null;
+    const address = providerProxy?.address ?? enteredAddress;
+    let username = typeof input.username === 'string' ? input.username.trim() : '';
+    if (providerProxy && !username) username = providerProxy.username;
+    requireValue(!(input.clearPassword && (own(input, 'password') || providerProxy)), 'Không thể vừa xóa vừa đặt mật khẩu.', 'password');
     let password = input.clearPassword ? '' : current.password;
+    if (providerProxy) password = providerProxy.password;
     if (own(input, 'password')) {
       requireValue(typeof input.password === 'string' && input.password.length > 0, 'Mật khẩu proxy không được để trống.', 'password');
       password = input.password;
@@ -399,8 +426,10 @@ export class Store {
     if (address) {
       let uri;
       try { uri = new URL(address); } catch { /* validated below */ }
-      requireValue(uri && ['http:', 'https:'].includes(uri.protocol) && !uri.username && !uri.password && uri.pathname === '/' && !uri.search && !uri.hash
-        && /:\d+\/?$/.test(address), 'Địa chỉ proxy phải là URI HTTP/HTTPS gồm host và port.', 'address');
+      requireValue(uri && ['http:', 'https:', 'socks5:'].includes(uri.protocol) && uri.hostname && !uri.username && !uri.password
+        && ['', '/'].includes(uri.pathname) && !uri.search && !uri.hash && /:\d+\/?$/.test(address)
+        && Number(address.match(/:(\d+)\/?$/)?.[1]) >= 1 && Number(address.match(/:(\d+)\/?$/)?.[1]) <= 65535,
+      'Địa chỉ proxy phải là URI HTTP/HTTPS/SOCKS5 gồm host và port từ 1–65535.', 'address');
     }
     requireValue(Boolean(address), 'Nhập địa chỉ proxy.', 'address');
     requireValue(!password || Boolean(username), 'Nhập username hoặc xóa mật khẩu proxy cũ.', 'username');

@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LotusLMS.RequestSigning.Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LotusLMS.Worker.V2.Tests", "LotusLMS.Worker.V2.Tests\LotusLMS.Worker.V2.Tests.csproj", "{BAAD90DA-D50C-4202-ACE5-43C99285F534}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProxyConnectivityTest", "ProxyConnectivityTest\ProxyConnectivityTest.csproj", "{268E130F-DBE2-458A-BC0C-ED0D95B48D1C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -111,6 +113,18 @@ Global
 		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Release|x64.Build.0 = Release|Any CPU
 		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Release|x86.ActiveCfg = Release|Any CPU
 		{BAAD90DA-D50C-4202-ACE5-43C99285F534}.Release|x86.Build.0 = Release|Any CPU
+		{268E130F-DBE2-458A-BC0C-ED0D95B48D1C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{268E130F-DBE2-458A-BC0C-ED0D95B48D1C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{268E130F-DBE2-458A-BC0C-ED0D95B48D1C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{268E130F-DBE2-458A-BC0C-ED0D95B48D1C}.Debug|x64.Build.0 = Debug|Any CPU
+		{268E130F-DBE2-458A-BC0C-ED0D95B48D1C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{268E130F-DBE2-458A-BC0C-ED0D95B48D1C}.Debug|x86.Build.0 = Debug|Any CPU
+		{268E130F-DBE2-458A-BC0C-ED0D95B48D1C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{268E130F-DBE2-458A-BC0C-ED0D95B48D1C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{268E130F-DBE2-458A-BC0C-ED0D95B48D1C}.Release|x64.ActiveCfg = Release|Any CPU
+		{268E130F-DBE2-458A-BC0C-ED0D95B48D1C}.Release|x64.Build.0 = Release|Any CPU
+		{268E130F-DBE2-458A-BC0C-ED0D95B48D1C}.Release|x86.ActiveCfg = Release|Any CPU
+		{268E130F-DBE2-458A-BC0C-ED0D95B48D1C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

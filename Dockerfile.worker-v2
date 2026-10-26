@@ -1,0 +1,25 @@
+# ---------- Build stage ----------
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY LotusLMS.Worker.V2/LotusLMS.Worker.V2.csproj LotusLMS.Worker.V2/
+COPY LotusLMS.Api/LotusLMS.Api.csproj LotusLMS.Api/
+COPY LotusLMS.Client/LotusLMS.Client.csproj LotusLMS.Client/
+COPY LotusLMS.Http/LotusLMS.Http.csproj LotusLMS.Http/
+COPY LotusLMS.RequestSigning/LotusLMS.RequestSigning.csproj LotusLMS.RequestSigning/
+RUN dotnet restore LotusLMS.Worker.V2/LotusLMS.Worker.V2.csproj
+
+COPY LotusLMS.Worker.V2/ LotusLMS.Worker.V2/
+COPY LotusLMS.Api/ LotusLMS.Api/
+COPY LotusLMS.Client/ LotusLMS.Client/
+COPY LotusLMS.Http/ LotusLMS.Http/
+COPY LotusLMS.RequestSigning/ LotusLMS.RequestSigning/
+RUN dotnet publish LotusLMS.Worker.V2/LotusLMS.Worker.V2.csproj \
+    -c Release -o /app/publish --no-restore
+
+# ---------- Runtime stage ----------
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+USER $APP_UID
+ENTRYPOINT ["dotnet", "LotusLMS.Worker.V2.dll"]

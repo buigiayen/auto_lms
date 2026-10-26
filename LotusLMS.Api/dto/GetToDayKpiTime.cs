@@ -5,10 +5,11 @@ public class GetToDayKpiTime
 
 public class TodayGainedKpiTime
 {
-    public int TotalGainedKpiTimeInSeconds { get; set; }
-    public int TotalGainedKpiTimeInSecondsByOnlineLearning { get; set; }
-    public int MaxGainedKpiTimeInSeconds { get; set; }
-    public int MaxOnlineLearningTimeInSeconds { get; set; }
+    // LMS reports elapsed seconds with fractions, including numeric strings.
+    public double TotalGainedKpiTimeInSeconds { get; set; }
+    public double TotalGainedKpiTimeInSecondsByOnlineLearning { get; set; }
+    public double MaxGainedKpiTimeInSeconds { get; set; }
+    public double MaxOnlineLearningTimeInSeconds { get; set; }
     public bool Full
     {
         get

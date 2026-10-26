@@ -134,8 +134,9 @@ internal sealed class AccountRunContext : IDisposable
     public IWebProxy? CreateWebProxy()
     {
         EnsureCanUse();
-        return _proxy is { } proxy ? new WebProxy(proxy.Address!)
-        { Credentials = string.IsNullOrEmpty(proxy.Username) ? null : new NetworkCredential(proxy.Username, proxy.Password) } : null;
+        if (!WorkerProxyConfiguration.TryCreateWebProxy(_proxy, _assignment.ServerTime, out var proxy))
+            throw new InvalidDataException("Proxy của account đã tắt, hết hạn hoặc không hợp lệ.");
+        return proxy;
     }
 
     private void CheckDeadline()
@@ -151,8 +152,8 @@ internal sealed class AccountRunContext : IDisposable
 
     private static bool ValidUrl(string? value) => Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && uri.Scheme is "http" or "https" && uri.UserInfo.Length == 0 && uri.Fragment.Length == 0 && uri.Query.Length == 0;
-    private static bool ValidProxy(ClientProxy? proxy, DateTimeOffset serverTime) => proxy is null
-        || (proxy.Enabled && ValidUrl(proxy.Address) && (proxy.ExpiresAt is null || proxy.ExpiresAt > serverTime));
+    private static bool ValidProxy(ClientProxy? proxy, DateTimeOffset serverTime) =>
+        WorkerProxyConfiguration.TryCreateWebProxy(proxy, serverTime, out _);
     private static bool SameProxy(ClientProxy? left, ClientProxy? right) => left is null ? right is null
         : right is not null && left.Id == right.Id && left.Enabled == right.Enabled && left.Address == right.Address
             && left.Username == right.Username && left.Password == right.Password && left.ExpiresAt == right.ExpiresAt;

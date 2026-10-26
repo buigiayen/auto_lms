@@ -10,7 +10,7 @@ const temp = () => mkdtempSync(join(tmpdir(), 'lotus-worker-registration-'));
 test('bootstrap-authenticated worker registration returns stable lane keys', async () => {
   const directory = temp();
   const registrationKey = 'fixture-registration-key-0123456789abcdef';
-  const app = createApp({ directory, workerRegistrationKey: registrationKey });
+  const app = createApp({ adminAuth: { username: 'fixture-admin', password: 'fixture-admin-password' }, directory, workerRegistrationKey: registrationKey });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${app.server.address().port}`;
   const register = async (workerName, key) => {
@@ -50,7 +50,7 @@ test('bootstrap-authenticated worker registration returns stable lane keys', asy
 
 test('worker registration is disabled when the client API has no bootstrap key', async () => {
   const directory = temp();
-  const app = createApp({ directory, workerRegistrationKey: '' });
+  const app = createApp({ adminAuth: { username: 'fixture-admin', password: 'fixture-admin-password' }, directory, workerRegistrationKey: '' });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   try {
     const response = await fetch(`http://127.0.0.1:${app.server.address().port}/api/workers`, {

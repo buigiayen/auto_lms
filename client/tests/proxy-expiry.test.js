@@ -55,7 +55,7 @@ test('dates validate and persist; migration preserves account assignments, passw
 
 test('Run filters expired proxies, validates stale selections atomically, and blocks expired live sessions and worker control', async () => {
   const folder = directory(); let time = Date.parse('2040-05-10T16:59:59.999Z'); let upstreamCalls = 0;
-  const app = createApp({ directory: folder, clock: () => time, lmsOptions: { fetcher: async () => {
+  const app = createApp({ adminAuth: null, directory: folder, clock: () => time, lmsOptions: { fetcher: async () => {
     upstreamCalls++;
     return new Response(JSON.stringify({ success: true, result: { pass: 1, token: 'fixture-token', iid: 123 } }));
   } } });

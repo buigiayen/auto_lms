@@ -1,3 +1,5 @@
+import { accountMood } from "./account-mood.js";
+
 const $ = (selector) => document.querySelector(selector);
 const icon = (name) => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
 const escape = (value) =>
@@ -21,6 +23,7 @@ const date = (value) =>
       }).format(new Date(value))
     : "—";
 const state = {
+  authenticated: false,
   view: "accounts",
   page: 1,
   logPage: 1,
@@ -46,6 +49,11 @@ async function api(path, { method = "GET", body, sessionId, signal } = {}) {
   if (response.status === 204) return {};
   const value = await response.json();
   if (!response.ok) {
+    if (response.status === 401 && value.error?.code === 'AUTH_REQUIRED') {
+      state.authenticated = false;
+      clearInterval(logTimer);
+      location.replace('/login' + location.hash);
+    }
     const message = value.error?.message ?? "Không thể hoàn thành yêu cầu.";
     const error = new Error(
       message +
@@ -87,19 +95,166 @@ const executionLabels = {
   failed: "Lỗi",
   lost: "Mất kết nối",
   stopped: "Đã dừng",
-  deferred: "Tạm hoãn đến ngày mai",
+  deferred: "Chờ lịch chạy lại",
 };
 const spinner = (message) =>
   `<div class="loading"><span class="spinner"></span>${escape(message)}</div>`;
 
+const accountWorker = (account) =>
+  account.execution?.workerName ||
+  (account.workerName === "unassigned" ? "Chưa tiếp nhận" : account.workerName) ||
+  "Chưa tiếp nhận";
+const mascotMoodLabels = {
+  sleeping: "Đang nghỉ",
+  awake: "Thức giấc",
+  celebrating: "Ăn mừng!",
+  angry: "Gặp lỗi",
+};
+const mascotMoodMessages = {
+  sleeping: "Nghỉ một chút, sẵn sàng khi bạn cần.",
+  awake: "Sẵn sàng nhận công việc mới.",
+  celebrating: "Xong việc rồi, nhảy ăn mừng thôi!",
+  angry: "Có lỗi rồi! Chọn tên worker để xem log.",
+};
+
+// Inline vector artwork keeps the character crisp at every size; CSS animates
+// the head, eyes and hands according to the account's current state.
+function mascotScene(account = null) {
+  return `<svg class="mascot-scene is-${accountMood(account)}" viewBox="0 0 280 200" aria-hidden="true">
+    <ellipse class="scene-shadow" cx="140" cy="182" rx="105" ry="9"/>
+    <g class="desk-chair"><path class="chair-stem" d="M140 137v40m-23 6 23-6 23 6"/><rect class="chair-back" x="108" y="82" width="64" height="64" rx="23"/></g>
+    <g class="mascot-body">
+      <path class="mascot-foot" d="M121 140v26q9 7 17 0v-24m7 0v24q10 7 17 0v-26"/>
+      <path class="mascot-shirt" d="M109 140v-25q0-22 31-22t31 22v25Z"/>
+      <path class="shirt-seam" d="m134 106 6 7 6-7m-6 7v20"/>
+      <g class="mascot-head">
+        <path class="mascot-ear" d="M108 64Q89 34 113 41l14 18m27-1q24-32 27-12l-9 26"/>
+        <path class="mascot-face" d="M103 73q0-27 37-27t37 27v17q0 25-37 25t-37-25Z"/>
+        <path class="mascot-tuft" d="M135 48q-8-13-1-18 11 3 11 17 9-13 17-8-1 9-17 12"/>
+        <ellipse class="mascot-cheek" cx="116" cy="87" rx="6" ry="4"/><ellipse class="mascot-cheek" cx="164" cy="87" rx="6" ry="4"/>
+        <g class="eyes-open"><ellipse cx="125" cy="78" rx="3" ry="4.5"/><ellipse cx="155" cy="78" rx="3" ry="4.5"/><path d="M135 88q5 6 10 0"/></g>
+        <g class="eyes-closed"><path d="m119 80 6 3 6-3m18 0 6 3 6-3"/><ellipse cx="140" cy="94" rx="3" ry="4"/></g>
+        <g class="eyes-happy"><path d="M119 79q6-10 12 0m18 0q6-10 12 0"/><path class="happy-mouth" d="M132 87q8 16 16 0Z"/></g>
+        <g class="eyes-angry"><path class="angry-brows" d="m118 68 14 6m16 0 14-6"/><ellipse cx="125" cy="79" rx="3" ry="3"/><ellipse cx="155" cy="79" rx="3" ry="3"/><path class="angry-mouth" d="M133 90q7-9 14 0"/></g>
+      </g>
+      <path class="mascot-hand hand-left" d="M111 114q-15 5-8 18l21 4"/><path class="mascot-hand hand-right" d="M170 114q15 5 8 18l-21 4"/>
+      <g class="celebration-arms"><path d="M111 115Q88 101 91 73m79 42q23-14 20-42"/><circle cx="91" cy="72" r="6"/><circle cx="190" cy="72" r="6"/></g>
+    </g>
+    <g class="sleep-letters"><text x="190" y="65">z</text><text x="207" y="48">z</text><text x="222" y="28">Z</text></g>
+    <g class="desk-furniture"><path class="desk-leg" d="M62 144v37m156-37v37"/><rect class="desk-front" x="46" y="139" width="188" height="12" rx="4"/><rect class="desk-top" x="40" y="133" width="200" height="9" rx="4"/></g>
+    <g class="laptop"><path class="laptop-shell" d="m105 130-7-40q-1-4 4-4h76q5 0 4 4l-7 40Z"/><path class="laptop-logo" d="M133 105q7-12 14 0-7 13-14 0Z"/><path class="laptop-error" d="m132 98 16 15m0-15-16 15"/><rect class="laptop-base" x="94" y="129" width="92" height="5" rx="2"/><circle class="laptop-light" cx="169" cy="124" r="2"/></g>
+    <g class="desk-plant"><path class="plant-stem" d="M65 116V97"/><path class="plant-leaf" d="M65 108q-18-1-12-15 13 2 12 15m0-4q0-17 14-14 0 13-14 14"/><path class="plant-pot" d="m55 113 3 20h15l3-20Z"/></g>
+    <g class="desk-cup"><path d="M205 118h8q9 7-1 9"/><path class="cup-body" d="M195 114h15v17h-15Z"/><path class="cup-steam" d="M201 107q-5-5 0-10"/></g>
+    <g class="celebration-confetti"><path class="confetti-gold" d="m68 47 5 8m130-28 7 5m-10 44 8-3"/><path class="confetti-green" d="m79 25 7 4m126 29 3-9M70 83l7-2"/><path class="confetti-pink" d="m99 39 3-7m80 5 5 7"/><path class="celebration-star" d="m213 19 2 6 6 2-6 2-2 6-2-6-6-2 6-2Z"/></g>
+    <g class="tantrum-hands"><g class="tantrum-left"><path d="M110 113Q83 104 104 123"/><circle cx="111" cy="123" r="7"/></g><g class="tantrum-right"><path d="M170 113Q193 101 173 110"/><circle cx="166" cy="110" r="7"/></g></g>
+    <g class="anger-symbol"><path d="M195 42v6h-6m15-6v6h6m-21 9h6v6m15-6h-6v6"/><path class="anger-steam" d="M86 65q-8-6-3-12m-5 16q-8-6-3-12"/></g>
+    <g class="tantrum-impact impact-desk"><path d="m92 130-7-5m6 11-10 1m102-6 7-6m-5 12 10 1"/></g>
+    <g class="tantrum-impact impact-chair"><path d="m102 94-8-5m7 13-11 2m84-11 8-5m-7 13 11 2"/></g>
+    <g class="tantrum-impact impact-laptop"><path d="m126 87-5-7m20 5v-10m17 12 6-7"/></g>
+  </svg>`;
+}
+
+function accountInformation(account) {
+  const execution = account.execution;
+  const fields = [
+    ["Căn cước", account.identityNumber],
+    ["Nhà cung cấp", providerName(account.provider)],
+    ["Giáo viên quản lý", account.managingTeacher || "Chưa nhập"],
+    ["Worker", accountWorker(account)],
+    ["Trạng thái", account.status === "running" ? "Treo" : "Dừng treo"],
+    ["Hoạt động", executionLabels[execution?.state] || "Đã dừng"],
+    ["Chương trình", account.enrolmentPlanIid ? `${account.enrolmentPlanName || "Chương trình học"} · IID ${account.enrolmentPlanIid}` : "Chưa chọn"],
+    ["Proxy", account.proxy ? `${account.proxy.name} · ${account.proxy.address}${account.proxy.enabled ? "" : " · Đang tắt"}` : "Kết nối trực tiếp"],
+    ...(account.proxy ? [["Hạn proxy", account.proxy.expiresOn || "Chưa đặt"]] : []),
+    ["Mật khẩu", account.hasPassword ? "Đã lưu, được mã hóa" : "Chưa lưu"],
+    ["Ngày tạo", date(account.createdAt)],
+    ["Cập nhật", date(account.updatedAt)],
+    ...(execution?.lastHeartbeatAt ? [["Heartbeat", date(execution.lastHeartbeatAt)]] : []),
+    ...(execution?.availableAfter ? [["Tiếp tục lúc", date(execution.availableAfter)]] : []),
+    ["ID tài khoản", account.id],
+    ...(execution?.runId ? [["ID lượt chạy", execution.runId]] : []),
+  ];
+  return `<dl class="mascot-information">${fields.map(([label, value]) => `<div><dt>${escape(label)}</dt><dd>${escape(value)}</dd></div>`).join("")}</dl>${execution?.lastLog ? `<div class="mascot-last-log"><span>LOG GẦN NHẤT · ${date(execution.lastLog.occurredAt)}</span><p>${escape(execution.lastLog.message)}</p></div>` : ""}`;
+}
+
+function accountStation(account) {
+  const mood = accountMood(account);
+  const execution = account.execution?.state || "stopped";
+  return `<article class="account-station station-${mood}" data-station-id="${escape(account.id)}">
+    <div class="station-heading"><span class="provider-tag"><span class="provider-symbol ${account.provider === "truongson" ? "blue" : ""}">${account.provider === "truongson" ? "T" : "Y"}</span>${providerName(account.provider)}</span><span class="station-status"><i></i>${mascotMoodLabels[mood]}</span></div>
+    <div class="mascot-target">
+      <button class="mascot-button" data-action="account" data-id="${escape(account.id)}" aria-label="Mở thao tác tài khoản ${escape(account.identityNumber)}" aria-describedby="account-tip-${escape(account.id)}" aria-haspopup="dialog">${mascotScene(account)}<span class="mascot-invitation">Chọn tôi để thao tác ${icon("arrow")}</span></button>
+      <div class="mascot-tooltip" id="account-tip-${escape(account.id)}" role="tooltip"><strong>Hồ sơ tài khoản</strong>${accountInformation(account)}</div>
+    </div>
+    <div class="station-account"><strong>${escape(account.identityNumber)}</strong><span class="execution-state ${escape(execution)}">${execution === "deferred" && account.execution?.availableAfter ? `Chạy lại ${date(account.execution.availableAfter)}` : executionLabels[execution] || escape(execution)}</span></div>
+    <button class="worker-nameplate" data-action="logs" data-id="${escape(account.id)}" aria-label="Xem log của ${escape(accountWorker(account))}, tài khoản ${escape(account.identityNumber)}">${icon("server")}<span>${escape(accountWorker(account))}</span>${icon("log")}</button>
+    <p class="station-activity" title="${escape(account.execution?.lastLog?.message || "")}">${escape(account.execution?.lastLog?.message || mascotMoodMessages[mood])}</p>
+  </article>`;
+}
+
+function renderAccountStations(accounts, total) {
+  const grid = $("#account-stations");
+  // Reuse unchanged stations during polling so animation, hover and keyboard
+  // focus survive the five-second refresh.
+  const existing = new Map(Array.from(grid.querySelectorAll("[data-station-id]"), (node) => [node.dataset.stationId, node]));
+  const retained = new Set(accounts.map((account) => account.id));
+  for (const [id, node] of existing) if (!retained.has(id)) node.remove();
+  grid.querySelectorAll(".office-placeholder").forEach((node) => node.remove());
+  if (!accounts.length) {
+    grid.insertAdjacentHTML("afterbegin", `<div class="office-placeholder">${total ? empty("Không tìm thấy người bạn nào", "Thử thay đổi từ khóa hoặc bộ lọc của bạn.") : empty("Văn phòng đang chờ người bạn đầu tiên", "Tạo tài khoản để một mascot mới có góc làm việc của riêng mình.")}</div>`);
+  }
+  let position = 0;
+  for (const account of accounts) {
+    const signature = JSON.stringify(account);
+    let node = existing.get(account.id);
+    if (!node || node.accountSignature !== signature) {
+      const template = document.createElement("template");
+      template.innerHTML = accountStation(account);
+      const next = template.content.firstElementChild;
+      if (node) {
+        // Keep the SVG mounted so heartbeats and incoming logs cannot restart
+        // a celebration or interrupt the desk/chair/laptop animation sequence.
+        node.className = next.className;
+        const scene = node.querySelector(".mascot-scene");
+        const sceneClass = next.querySelector(".mascot-scene").getAttribute("class");
+        if (scene.getAttribute("class") !== sceneClass) scene.setAttribute("class", sceneClass);
+        for (const selector of [".station-heading", ".mascot-tooltip", ".station-account", ".worker-nameplate", ".station-activity"]) {
+          const current = node.querySelector(selector), replacement = next.querySelector(selector);
+          if (current.innerHTML !== replacement.innerHTML) current.innerHTML = replacement.innerHTML;
+        }
+        for (const [selector, attribute] of [[".mascot-button", "aria-label"], [".worker-nameplate", "aria-label"], [".station-activity", "title"]])
+          node.querySelector(selector).setAttribute(attribute, next.querySelector(selector).getAttribute(attribute));
+      } else node = next;
+      node.accountSignature = signature;
+      if (grid.children[position] !== node) grid.insertBefore(node, grid.children[position] || null);
+    } else if (grid.children[position] !== node) {
+      grid.insertBefore(node, grid.children[position] || null);
+    }
+    position++;
+  }
+  if (!grid.querySelector(".station-create")) grid.insertAdjacentHTML("beforeend", `<button class="station-create" data-create aria-haspopup="dialog"><span class="create-mascot" aria-hidden="true">${icon("plus")}</span><strong>Một người bạn mới</strong><span>Thêm tài khoản vào văn phòng</span><span class="create-seat">Còn một chỗ dành cho bạn ${icon("arrow")}</span></button>`);
+  grid.setAttribute("aria-busy", "false");
+}
+
+function accountActions(account) {
+  const epoch = openDialog(
+    `Tài khoản ${account.identityNumber}`,
+    `${providerName(account.provider)} · ${accountWorker(account)}`,
+    `<div class="dialog-body account-actions-body"><div class="account-action-preview ${account.provider === "yenthuy" ? "station-yenthuy" : ""}">${mascotScene(account)}<span class="badge ${account.status}">${account.status === "running" ? "Treo" : "Dừng treo"} · ${executionLabels[account.execution?.state] || "Đã dừng"}</span></div><div class="mascot-actions"><button class="mascot-action" data-action="toggle" data-id="${escape(account.id)}">${icon(account.status === "running" ? "pause" : "play")}<span><strong>${account.status === "running" ? "Dừng treo" : "Run tài khoản"}</strong><small>${account.status === "running" ? "Cho mascot nghỉ và dừng công việc" : "Chọn chương trình học và bắt đầu"}</small></span>${icon("arrow")}</button><button class="mascot-action" data-action="edit" data-id="${escape(account.id)}">${icon("edit")}<span><strong>Sửa thông tin</strong><small>Cập nhật tài khoản, giáo viên và proxy</small></span>${icon("arrow")}</button><button class="mascot-action" data-action="details" data-id="${escape(account.id)}">${icon("grid")}<span><strong>Xem chi tiết</strong><small>Mở chương trình và thông tin học tập</small></span>${icon("arrow")}</button></div><details class="account-profile"><summary>Thông tin đầy đủ của tài khoản</summary>${accountInformation(account)}</details></div>`,
+  );
+  state.modal = { type: "account-actions", epoch, account };
+}
+
 async function loadAccounts() {
   const version = ++state.accountRequest;
+  $("#account-stations").setAttribute("aria-busy", "true");
   const params = new URLSearchParams({
     page: state.page,
     pageSize: 20,
     search: $("#account-search").value,
     provider: $("#provider-filter").value,
     status: $("#status-filter").value,
+    mood: $("#mascot-filter").value,
   });
   errorBox("#accounts-error", "");
   try {
@@ -113,23 +268,7 @@ async function loadAccounts() {
     $("#account-count").textContent = result.pagination.total;
     $("#connection").innerHTML =
       '<span class="status-dot"></span>Kết nối local';
-    const rows = result.data
-      .map(
-        (account) => `<tr>
-      <td><div class="account-cell"><span class="account-avatar">${icon("users")}</span><div><span class="account-name">${escape(account.identityNumber)}</span><span class="account-hint" title="${escape(account.enrolmentPlanName)}">${account.enrolmentPlanIid ? `${escape(account.enrolmentPlanName || "Chương trình học")} · IID ${account.enrolmentPlanIid}` : "Căn cước công dân"}</span></div></div></td>
-      <td><span class="provider-tag"><span class="provider-symbol ${account.provider === "truongson" ? "blue" : ""}">${account.provider === "truongson" ? "T" : "Y"}</span>${providerName(account.provider)}</span></td>
-      <td class="teacher-cell" title="${escape(account.managingTeacher)}"><span class="${account.managingTeacher ? "" : "muted"}">${escape(account.managingTeacher || "Chưa nhập")}</span></td>
-      <td class="worker-activity"><span class="worker-label">${escape(account.execution?.workerName ?? (account.workerName === "unassigned" ? "Chưa tiếp nhận" : account.workerName))}</span>${account.execution?.lastLog ? `<small class="activity-preview" title="${escape(account.execution.lastLog.message)}">${escape(account.execution.lastLog.message)}</small>` : ""}</td>
-      <td class="proxy-cell" title="${escape(account.proxy?.address ?? "Kết nối trực tiếp")}">${account.proxy ? `<span>${escape(account.proxy.name)}${account.proxy.enabled ? "" : " · Đang tắt"}</span><small>${escape(account.proxy.address)}</small>${proxyDeadline(account.proxy)}` : '<span class="muted">Trực tiếp</span>'}</td>
-      <td><span class="badge ${account.status}">${account.status === "running" ? "Treo" : "Dừng treo"}</span>${account.execution ? `<small class="execution-state ${account.execution.state}">${executionLabels[account.execution.state] ?? escape(account.execution.state)}</small>` : ""}</td>
-      <td class="date-cell">${date(account.updatedAt)}</td>
-      <td><div class="row-actions"><button class="icon-button" data-action="toggle" data-id="${account.id}" aria-label="${account.status === "running" ? "Dừng treo" : "Treo"} ${escape(account.identityNumber)}" title="${account.status === "running" ? "Dừng treo" : "Treo"}">${icon(account.status === "running" ? "pause" : "play")}</button><button class="icon-button" data-action="edit" data-id="${account.id}" title="Sửa thông tin" aria-label="Sửa ${escape(account.identityNumber)}">${icon("edit")}</button><button class="icon-button" data-action="logs" data-id="${account.id}" title="Xem log" aria-label="Xem log ${escape(account.identityNumber)}">${icon("log")}</button><button class="button detail-button" data-action="details" data-id="${account.id}">Chi tiết${icon("arrow")}</button></div></td>
-    </tr>`,
-      )
-      .join("");
-    $("#account-rows").innerHTML =
-      rows ||
-      `<tr><td colspan="8">${summary.total ? empty("Không tìm thấy tài khoản", "Thử thay đổi từ khóa hoặc bộ lọc của bạn.") : empty("Bắt đầu với tài khoản đầu tiên", "Thêm tài khoản LMS để quản lý trạng thái và theo dõi hoạt động của worker.", true)}</td></tr>`;
+    renderAccountStations(result.data, summary.total);
     const total = result.pagination.total,
       start = total ? (state.page - 1) * 20 + 1 : 0;
     $("#accounts-range").textContent =
@@ -142,8 +281,10 @@ async function loadAccounts() {
   } catch (error) {
     if (version !== state.accountRequest) return;
     errorBox("#accounts-error", error.message);
-    $("#account-rows").innerHTML =
-      `<tr><td colspan="8">${empty("Chưa kết nối được backend", "Kiểm tra Node.js server và bấm Làm mới để thử lại.")}</td></tr>`;
+    const grid = $("#account-stations");
+    grid.setAttribute("aria-busy", "false");
+    if (!grid.querySelector("[data-station-id]"))
+      grid.innerHTML = `<div class="office-placeholder">${empty("Chưa kết nối được backend", "Kiểm tra Node.js server và bấm Làm mới để thử lại.")}</div>`;
     $("#connection").textContent = "Mất kết nối local";
   }
 }
@@ -490,7 +631,7 @@ async function loadLogs() {
 function accountLogs(account) {
   const epoch = openDialog(
     "Nhật ký tài khoản",
-    `${account.identityNumber} · ${providerName(account.provider)} · ${account.workerName}`,
+    `${account.identityNumber} · ${providerName(account.provider)} · ${accountWorker(account)}`,
     `<div class="dialog-body"><div class="filters"><select id="modal-log-level" aria-label="Cấp độ log"><option value="">Tất cả cấp độ</option><option value="info">Info</option><option value="warn">Warning</option><option value="error">Error</option><option value="debug">Debug</option></select><label class="date-filter">Từ thời điểm<input type="datetime-local" id="modal-log-from"></label><label class="date-filter">Đến thời điểm<input type="datetime-local" id="modal-log-to"></label></div><div id="modal-log-content">${spinner("Đang tải nhật ký…")}</div><div class="pagination modal-pagination"><span id="modal-log-range"></span><div><button class="button small" id="modal-log-prev">←</button><span id="modal-log-page">Trang 1</span><button class="button small" id="modal-log-next">→</button></div></div></div>`,
     { wide: true },
   );
@@ -734,6 +875,7 @@ function fillProxy(proxy) {
     : "Thêm cấu hình proxy";
   $("#proxy-name").value = proxy?.name ?? "";
   $("#proxy-expires-on").value = proxy?.expiresOn ?? "";
+  $("#proxy-provider-value").value = "";
   $("#proxy-enabled").checked = proxy?.enabled ?? true;
   $("#proxy-username").value = proxy?.username ?? "";
   $("#proxy-password").value = "";
@@ -755,7 +897,7 @@ function fillProxy(proxy) {
     const uri = new URL(proxy.address);
     $("#proxy-protocol").value = uri.protocol.replace(":", "");
     $("#proxy-host").value = uri.hostname;
-    $("#proxy-port").value = uri.port || (uri.protocol === "https:" ? 443 : 80);
+    $("#proxy-port").value = uri.port || (uri.protocol === "socks5:" ? 1080 : uri.protocol === "https:" ? 443 : 80);
   }
   errorBox("#proxy-error", "");
   $("#proxy-result").hidden = true;
@@ -805,6 +947,48 @@ function proxyBody() {
   if ($("#proxy-clear").checked) body.clearPassword = true;
   return body;
 }
+function parseProviderProxyValue(value) {
+  const trimmed = value.trim(),
+    scheme = trimmed.match(/^(https?|socks5):\/\//i),
+    raw = scheme ? trimmed.slice(scheme[0].length) : trimmed;
+  if (scheme && /^(?:\[[^\]]+\]|[^:/]+):\d+\/?$/.test(raw)) {
+    const uri = new URL(trimmed);
+    const port = Number(raw.match(/:(\d+)\/?$/)[1]);
+    if (uri.hostname && port > 0 && port <= 65535
+      && ["", "/"].includes(uri.pathname) && !uri.search && !uri.hash)
+      return { host: uri.hostname, port, protocol: scheme[1].toLowerCase(), username: "", password: "" };
+  }
+  const match = raw.startsWith("[")
+    ? raw.match(/^(\[[^\]]+\]):(\d+):([^:]+):(.*)$/)
+    : raw.match(/^([^:]+):(\d+):([^:]+):(.*)$/);
+  if (!match || !match[1].trim() || !match[3].trim())
+    throw new Error("Nhập host:port:username:password hoặc URI như socks5://host:port.");
+  const port = Number(match[2]);
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    throw new Error("Port proxy phải là số từ 1–65535.");
+  return {
+    host: match[1].trim(),
+    port,
+    protocol: scheme ? scheme[1].toLowerCase() : "http",
+    username: match[3].trim(),
+    password: match[4],
+  };
+}
+$("#import-proxy-value").onclick = () => {
+  try {
+    const proxy = parseProviderProxyValue($("#proxy-provider-value").value);
+    $("#proxy-host").value = proxy.host;
+    $("#proxy-port").value = proxy.port;
+    $("#proxy-protocol").value = proxy.protocol;
+    $("#proxy-username").value = proxy.username;
+    $("#proxy-password").value = proxy.password;
+    $("#proxy-clear").checked = !proxy.username;
+    $("#proxy-provider-value").value = "";
+    errorBox("#proxy-error", "");
+  } catch (error) {
+    errorBox("#proxy-error", error.message);
+  }
+};
 $("#proxy-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const button = event.submitter;
@@ -872,6 +1056,7 @@ $("#proxy-list").addEventListener("click", async (event) => {
 
 let logTimer;
 function navigate() {
+  if (!state.authenticated) return;
   const view = location.hash.slice(1);
   state.view = ["accounts", "logs", "proxy", "workers"].includes(view)
     ? view
@@ -908,6 +1093,30 @@ function navigate() {
   if (state.view === "proxy") loadProxy();
 }
 window.addEventListener("hashchange", navigate);
+for (const type of ["pointerover", "focusin"])
+  $("#account-stations").addEventListener(type, (event) => {
+    const target = event.target.closest(".mascot-target");
+    if (!target || target.contains(event.relatedTarget)) return;
+    const bounds = target.getBoundingClientRect();
+    const above = bounds.top;
+    const below = window.innerHeight - bounds.bottom;
+    const showAbove = above > below;
+    target.classList.toggle("tooltip-above", showAbove);
+    target.querySelector(".mascot-tooltip").style.maxHeight =
+      `${Math.max(80, Math.min(500, window.innerHeight * .65, showAbove ? above : below))}px`;
+  });
+// Escape dismisses hover information without moving keyboard focus.
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || $("#dialog").open) return;
+  document.querySelectorAll(".mascot-target:hover, .mascot-target:focus-within")
+    .forEach((target) => target.classList.add("tooltip-dismissed"));
+});
+for (const type of ["pointerout", "focusout"])
+  $("#account-stations").addEventListener(type, (event) => {
+    const target = event.target.closest(".mascot-target");
+    if (target && !target.contains(event.relatedTarget))
+      target.classList.remove("tooltip-dismissed");
+  });
 $("#dialog").addEventListener("cancel", (event) => {
   event.preventDefault();
   closeDialog();
@@ -924,6 +1133,7 @@ document.addEventListener("click", async (event) => {
   const account = state.accounts.find((a) => a.id === button.dataset.id);
   if (!account) return;
   const action = button.dataset.action;
+  if (action === "account") accountActions(account);
   if (action === "edit") accountForm(account);
   if (action === "details") details(account);
   if (action === "logs") accountLogs(account);
@@ -932,12 +1142,15 @@ document.addEventListener("click", async (event) => {
       runAccount(account);
       return;
     }
+    const actionEpoch = state.modalEpoch;
     button.disabled = true;
     try {
       await api(`/api/accounts/${account.id}/status`, {
         method: "PATCH",
         body: { status: account.status === "running" ? "stopped" : "running" },
       });
+      if (state.modal?.type === "account-actions" && state.modalEpoch === actionEpoch)
+        closeDialog();
       toast("Đã cập nhật trạng thái.");
       await loadAccounts();
     } catch (error) {
@@ -954,7 +1167,7 @@ $("#account-search").oninput = () => {
     loadAccounts();
   }, 250);
 };
-for (const selector of ["#provider-filter", "#status-filter"])
+for (const selector of ["#provider-filter", "#status-filter", "#mascot-filter"])
   $(selector).onchange = () => {
     state.page = 1;
     loadAccounts();
@@ -1010,4 +1223,30 @@ $("#copy-registration-key").onclick = async () => {
     toast("Không thể truy cập clipboard. Khóa đã được chọn để bạn sao chép thủ công.", true);
   }
 };
-navigate();
+$('#logout').addEventListener('click', async event => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  closeDialog();
+  try {
+    await api('/api/auth/logout', { method: 'POST' });
+    state.authenticated = false;
+    clearInterval(logTimer);
+    location.replace('/login');
+  } catch (error) {
+    toast(error.message, true);
+    button.disabled = false;
+  }
+});
+window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
+try {
+  const { data } = await api('/api/auth/session');
+  if (!data.authenticated) location.replace('/login' + location.hash);
+  else {
+    state.authenticated = true;
+    $('#session-user').textContent = data.username || '';
+    $('#session-avatar').textContent = Array.from(data.username || 'LC').slice(0, 2).join('').toUpperCase();
+    navigate();
+  }
+} catch (error) {
+  toast('Không thể kiểm tra phiên đăng nhập. Vui lòng tải lại trang.', true);
+}

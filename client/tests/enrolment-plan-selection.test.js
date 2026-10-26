@@ -11,7 +11,7 @@ const input = { identityNumber: '000000000001', password: 'fixture-password', pr
 const temp = () => mkdtempSync(join(tmpdir(), 'lotus-plan-'));
 async function setup(clock) {
   const directory = temp(), calls = [];
-  const app = createApp({ directory, clock, lmsOptions: { fetcher: async (url, options) => {
+  const app = createApp({ adminAuth: null, directory, clock, lmsOptions: { fetcher: async (url, options) => {
     const uri = new URL(url); calls.push({ uri, dispatcher: options.dispatcher });
     if (uri.pathname.endsWith('/login')) return new Response(JSON.stringify({ success: true, result: { pass: 1, token: 'fixture-token', iid: 12 } }));
     assert.ok(uri.pathname.endsWith('get-student-enrolment-plans'), 'Run must not request courses');

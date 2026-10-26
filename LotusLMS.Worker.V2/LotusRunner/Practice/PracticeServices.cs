@@ -21,11 +21,22 @@ public class PracticeServices(
         var pendingPractices = AutoStudy
             .Where(p => p.typeAutoStudy == CheckingTimeDTO.TypeAutoStudy.PracticeOnly)
             .ToList();
+        var attempts = new Dictionary<(int? Course, int Practice), int>();
 
         while (pendingPractices.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var item = pendingPractices[0];
+            var key = (item.iidRoot, item.iid);
+            var attempt = attempts.GetValueOrDefault(key) + 1;
+            attempts[key] = attempt;
+            logger.LogInformation(
+                "PRACTICE_SELECT course={CourseIid} practice={PracticeIid} attempt={Attempt} pending={Pending}",
+                item.iidRoot, item.iid, attempt, pendingPractices.Count);
+            if (attempt > 1)
+                logger.LogWarning(
+                    "PRACTICE_REPEAT course={CourseIid} practice={PracticeIid} attempt={Attempt} reason=still-pending-after-refresh",
+                    item.iidRoot, item.iid, attempt);
 
             var timeStart = timeProvider.GetUtcNow().ToUnixTimeSeconds();
             var getPracticeDetail = await client.GetPracticeDetailAsync(lotusLmsSession, item.iid, item.iidRoot!.Value, cancellationToken);
@@ -55,15 +66,22 @@ public class PracticeServices(
             {
                 throw new InvalidDataException("Question bank has questions; cannot auto-answer a non-empty bank.");
             }
+            var startId = Guid.NewGuid().ToString("N");
+            logger.LogInformation(
+                "PRACTICE_START_SEND sendId={SendId} course={CourseIid} practice={PracticeIid} attempt={Attempt}",
+                startId, item.iidRoot, item.iid, attempt);
             var started = await client.StartPracticeAsync(
                 lotusLmsSession,
                 item.iid,
                 examScoIid,
                 item.iidRoot.Value, cancellationToken);
             var takeId = LotusLMS.Worker2.LotusLmsJson.ReadString(started["result"]?["id"]);
+            logger.LogInformation(
+                "PRACTICE_START_ACK sendId={SendId} course={CourseIid} practice={PracticeIid} attempt={Attempt} take={TakeId}",
+                startId, item.iidRoot, item.iid, attempt, takeId);
 
             await SubmitQuestionBankAsync(lotusLmsSession, item.iid, examScoIid, item.iidRoot.Value,
-            bank.Result, takeId, timeStart, new HashSet<string>(), workerOptions.Value, cancellationToken);
+            bank.Result, takeId, timeStart, new HashSet<string>(), workerOptions.Value, attempt, cancellationToken);
             if (await learningTimeTrackingService.TrackAsync(
                     lotusLmsSession,
                     cancellationToken,
@@ -100,6 +118,7 @@ public class PracticeServices(
         long timeStart,
         ISet<string> doneIids,
         WorkerOptions options,
+        int attempt,
         CancellationToken cancellationToken)
     {
         var questions = bank.Questions?.Result;
@@ -174,6 +193,9 @@ public class PracticeServices(
                 isLast,
                 options,
                 elapsedMilliseconds,
+                attempt,
+                offset / options.PracticeBatchSize + 1,
+                (total + options.PracticeBatchSize - 1) / options.PracticeBatchSize,
                 cancellationToken);
             submitted += saved.Submitted;
             if (saved.Submitted > 0) batches++;
@@ -206,6 +228,9 @@ public class PracticeServices(
      bool isLast,
      WorkerOptions options,
      long elapsedMilliseconds,
+     int attempt,
+     int batchNumber,
+     int batchCount,
      CancellationToken cancellationToken)
     {
         var items = new List<PracticeTakeItem>();
@@ -253,6 +278,11 @@ public class PracticeServices(
             return (0, takeId, 0, false, false);
         }
 
+        var sendId = Guid.NewGuid().ToString("N");
+        logger.LogInformation(
+            "PRACTICE_SEND sendId={SendId} course={CourseIid} practice={PracticeIid} take={TakeId} attempt={Attempt} batch={Batch}/{BatchCount} questions={QuestionIds} seconds={Seconds}",
+            sendId, courseIid, practiceIid, takeId, attempt, batchNumber, batchCount,
+            string.Join(",", items.Select(item => item.QuestionId)), timeUsed);
         var response = await client.SavePracticeTakeAsync(
             session,
             new SavePracticeTakeRequest
@@ -273,6 +303,13 @@ public class PracticeServices(
             cancellationToken: cancellationToken);
         var alreadyOvertime = ReadFlag(response["result"]?["already_overtime_before_this_api"]);
         var serverFinished = ReadFlag(response["result"]?["take_is_finished_automatically_by_server"]);
+        var returnedTakeId = LotusLmsJson.ReadString(response["result"]?["take_id"])
+            ?? LotusLmsJson.ReadString(response["result"]?["id"])
+            ?? takeId;
+        logger.LogInformation(
+            "PRACTICE_ACK sendId={SendId} course={CourseIid} practice={PracticeIid} take={TakeId} returnedTake={ReturnedTakeId} attempt={Attempt} batch={Batch}/{BatchCount} gainedKpi={GainedKpi} overtime={Overtime} serverFinished={ServerFinished}",
+            sendId, courseIid, practiceIid, takeId, returnedTakeId, attempt, batchNumber, batchCount,
+            ReadSeconds(response["result"]?["you_have_just_gained"]), alreadyOvertime, serverFinished);
         if (alreadyOvertime)
             logger.LogWarning("Practice {PracticeIid}: server reports overtime before this save; a successful save does not imply KPI credit.", practiceIid);
         if (serverFinished)
@@ -280,9 +317,7 @@ public class PracticeServices(
                 practiceIid, LotusLmsJson.ReadString(response["result"]?["reason_server_finish_practice_take_automatically"]));
 
         return (items.Count,
-            LotusLmsJson.ReadString(response["result"]?["take_id"])
-                ?? LotusLmsJson.ReadString(response["result"]?["id"])
-                ?? takeId,
+            returnedTakeId,
             ReadSeconds(response["result"]?["you_have_just_gained"]), alreadyOvertime, serverFinished);
     }
 

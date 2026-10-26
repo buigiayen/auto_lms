@@ -14,7 +14,7 @@ const directory = mkdtempSync(join(tmpdir(), 'lotus-worker-v2-'));
 let upstreamCalls = 0, dropClaim = true, dropLog = true, dropFinish = true, listRequests = 0, finishRequests = 0;
 let delayedFinishAccount = null, parallelSecondAccount = null, finishResponsePending = false, parallelClaimedDuringFinish = false;
 const registrationKey = 'fixture-worker-registration-key-0123456789abcdef';
-const app = createApp({
+const app = createApp({ adminAuth: { username: 'fixture-admin', password: 'fixture-admin-password' },
   directory,
   workerRegistrationKey: registrationKey,
   lmsOptions: { fetcher: async () => { upstreamCalls++; throw new Error('Unexpected LMS call'); } }

@@ -147,8 +147,12 @@ X-Worker-Lease-Token.
 `POST /api/worker/accounts/:accountId/finish` nhận cùng ba trường sở hữu và
 `outcome: "completed" | "failed" | "stopped" | "deferred"`. Backend nhả khóa,
 ghi log và với completed/failed/stopped thường chuyển account sang Dừng treo.
-`deferred` giữ account ở trạng thái Treo nhưng không cho nhận lại trước 00:00
-ngày hôm sau theo giờ Việt Nam; lane được nhận account khác trong thời gian đó.
+`deferred` giữ account ở trạng thái Treo và chọn ngẫu nhiên một thời điểm trong
+khung **00:00:00–08:00:00 ngày hôm sau theo giờ Việt Nam**, chính xác đến giây.
+Backend lưu thời điểm này vào `accounts.available_after` và trả qua
+`execution.availableAfter`; account không thể được nhận trước lịch, kể cả claim
+trực tiếp. Lane được nhận account khác trong thời gian đó. Lịch được giữ nguyên
+khi khởi động lại hoặc gửi lại finish; lần đạt KPI ngày tiếp theo sẽ chọn lịch mới.
 Nhấn Dừng treo rồi Treo lại sẽ xóa thời gian hoãn. Gửi lại cùng kết quả là idempotent.
 Nhấn Dừng rồi Run lại khi Worker đang dừng vẫn giữ khóa cũ; finish mới nhả khóa
 và giữ account trong hàng chờ cho lượt kế tiếp.

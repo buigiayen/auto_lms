@@ -177,8 +177,11 @@ khóa học cũ. Mở lại ứng dụng giữ nguyên lựa chọn.
 
 Thêm `accounts.available_after` để giữ account ở trạng thái Treo nhưng tạm ẩn
 khỏi hàng chờ đến thời điểm đó. Khi Worker kết thúc lượt với `deferred`, Backend
-đặt thời điểm nhận lại là 00:00 ngày tiếp theo theo giờ Việt Nam; Worker lane
-được giải phóng cho account khác. Run/Treo thủ công xóa thời gian hoãn.
+chọn ngẫu nhiên thời điểm nhận lại trong khung 00:00:00–08:00:00 ngày tiếp theo
+theo giờ Việt Nam, rồi lưu dưới dạng UTC ISO 8601 trong `available_after`.
+Lịch được chọn một lần cho mỗi lượt đạt KPI, giữ nguyên khi khởi động lại hay
+gửi lại finish. Worker lane được giải phóng cho account khác. Run/Treo thủ công
+xóa thời gian hoãn.
 
 Migration sao lưu vào `client.before-worker-deferral.sqlite`, thêm cột
 `available_after` và mở rộng trạng thái kết thúc của `worker_runs` bằng

@@ -29,5 +29,8 @@ services
 
 When `Enabled` is `false`, the handler connects directly. When it is `true`,
 the address and credential combination are validated during host startup.
+Addresses support HTTP, HTTPS, and SOCKS5 (for example,
+`socks5://160.250.166.18:11548`). Use the provider's SOCKS port for SOCKS5;
+leave username/password empty when authentication is not required.
 Applications should supply proxy passwords through a secret provider or
 environment variable and must not write option values to logs.

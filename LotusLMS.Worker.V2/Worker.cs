@@ -176,6 +176,8 @@ internal sealed class WorkerLane(
     {
         using (context)
         {
+            using var accountScope = _logger.BeginScope(new AccountLogScope(
+                workerName, context.AccountId, context.Ownership.RunId, context.EnrolmentPlanIid));
             var leaseTask = lease.RunAsync(context, stoppingToken);
             var outcome = "stopped";
             var reason = context.ValidateConfiguration();
@@ -215,7 +217,7 @@ internal sealed class WorkerLane(
                         reason = result switch
                         {
                             AccountStudyResult.Completed => "Đã hoàn thành chương trình học.",
-                            AccountStudyResult.DailyKpiReached => "Đã đạt KPI trong ngày; account được tạm hoãn đến 00:00 ngày mai (giờ Việt Nam).",
+                            AccountStudyResult.DailyKpiReached => "Đã đạt KPI trong ngày; account được hẹn chạy lại vào giờ ngẫu nhiên trong khung 00:00–08:00 ngày mai (giờ Việt Nam).",
                             _ => "Quy trình học chưa hoàn tất."
                         };
                     }
@@ -377,7 +379,7 @@ internal sealed class WorkerLane(
     private string GetSafeFailureReason(Exception error) => error switch
     {
         LotusClientException clientError => $"Lỗi Client API ({clientError.Code}).",
-        LotusLmsApiException lmsError => $"Lỗi LMS tại {lmsError.Endpoint} ({lmsError.StatusCode?.ToString() ?? "network"}).",
+        LotusLmsApiException lmsError => LmsFailureDiagnostics.Describe(lmsError),
         _ => $"Lỗi xử lý account ({error.GetType().Name})."
     };
 
@@ -386,11 +388,10 @@ internal sealed class WorkerLane(
         if (error is LotusLmsApiException lmsError)
         {
             _logger.LogError(
-                "Account {AccountId} failed in lane {WorkerName} at LMS endpoint {Endpoint} ({StatusCode}).",
+                "Account {AccountId} failed in lane {WorkerName}: {Failure}",
                 accountId,
                 workerName,
-                lmsError.Endpoint,
-                lmsError.StatusCode);
+                LmsFailureDiagnostics.Describe(lmsError));
             return;
         }
 

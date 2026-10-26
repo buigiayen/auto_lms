@@ -9,6 +9,30 @@
 - Giao diện và backend cùng origin. Mặc định server chỉ lắng nghe localhost.
 - Các giá trị trong ví dụ là dữ liệu minh họa, không phải thông tin tài khoản thật.
 
+### Đăng nhập quản trị
+
+Server yêu cầu `CLIENT_USERNAME` và `CLIENT_PASSWORD` trong môi trường/`.env`.
+Các API quản trị tài khoản, log, proxy yêu cầu cookie phiên hợp lệ. Root `/`
+chuyển hướng sang `/login` khi chưa đăng nhập; API trả `401 AUTH_REQUIRED`.
+
+| Method | Endpoint | Kết quả |
+| --- | --- | --- |
+| GET | `/api/auth/session` | `{ data: { authenticated, username } }`; username là null khi chưa đăng nhập |
+| POST | `/api/auth/login` | JSON `{ username, password }`; đối chiếu đúng thì cấp cookie và trả authenticated/username |
+| POST | `/api/auth/logout` | Hủy phiên ở server, xóa cookie và trả 204 |
+
+Cookie `lotus_admin_session` dùng HttpOnly, SameSite=Strict, Path=/ và hết hạn
+sau 12 giờ. Đặt `CLIENT_SESSION_SECURE=true` khi sử dụng HTTPS. Token ngẫu nhiên
+được lưu dạng digest trong bộ nhớ; restart vô hiệu hóa phiên cũ. Mười lần sai
+trong 5 phút theo địa chỉ kết nối sẽ chặn đăng nhập thêm, trả 429 kèm Retry-After.
+Các request trình duyệt vẫn được kiểm tra Origin.
+
+`GET /api/health` công khai cho health check. Đăng nhập quản trị không thay thế
+khóa worker: `/api/workers` dùng bootstrap key, `/api/worker/*` dùng API key.
+Worker đọc `GET /api/accounts/:id` bằng API key chỉ khi được gán đúng account;
+đọc `GET /api/proxies/:id` còn yêu cầu ownership của lượt chạy. Khóa worker
+không cho phép gọi API quản trị danh sách/log/chỉnh sửa tài khoản.
+
 Các endpoint `/api/worker/*` yêu cầu `Authorization: Bearer <worker-api-key>`.
 Hợp đồng Worker: [WORKER_QUEUE.md](WORKER_QUEUE.md).
 Backend cấu hình ánh xạ API key với `workerName`; không tin riêng `workerName`
@@ -30,13 +54,16 @@ Response lỗi chung:
 | HTTP | Mã lỗi | Khi nào |
 | --- | --- | --- |
 | 400 | `VALIDATION_ERROR` | Dữ liệu không hợp lệ |
+| 401 | `AUTH_REQUIRED` | Thiếu hoặc hết hạn phiên đăng nhập quản trị |
+| 401 | `LOGIN_INVALID` | Sai tên đăng nhập hoặc mật khẩu |
+| 429 | `LOGIN_RATE_LIMITED` | Quá nhiều lần đăng nhập sai trong 5 phút |
 | 401 | `WORKER_UNAUTHORIZED` | Thiếu/sai API key worker |
 | 401 | `WORKER_REGISTRATION_UNAUTHORIZED` | Thiếu/sai khóa bootstrap khi đăng ký Worker |
 | 503 | `WORKER_REGISTRATION_DISABLED` | Client API chưa cấu hình `WORKER_REGISTRATION_KEY` |
 | 403 | `RUN_OWNERSHIP_MISMATCH` | Sai Worker, instance, run hoặc lease token |
 | 403 | `WORKER_PROXY_MISMATCH` | Proxy không được gán cho account mà Worker đang sở hữu |
 | 409 | `ACCOUNT_CLAIMED` | Account đã được Worker tiếp nhận |
-| 409 | `ACCOUNT_DEFERRED` | Account đang được hoãn đến 00:00 ngày hôm sau theo giờ Việt Nam |
+| 409 | `ACCOUNT_DEFERRED` | Account chưa đến lịch chạy lại, được chọn ngẫu nhiên trong khung 00:00–08:00 ngày hôm sau theo giờ Việt Nam |
 | 409 | `LEASE_LOST` | Mất heartbeat hoặc lượt chạy đã kết thúc |
 | 409 | `ACCOUNT_BUSY` | Chờ Worker dừng trước khi sửa thông tin |
 | 404 | `ACCOUNT_NOT_FOUND` | Không tìm thấy tài khoản |
@@ -129,6 +156,13 @@ Các response thông tin tài khoản dùng cùng cấu trúc `data` trên. Khô
 ## 4. Danh sách và sửa thông tin
 
 `GET /api/accounts?search=worker-01&provider=truongson&status=stopped&page=1&pageSize=20`
+
+Thêm `mood=sleeping|awake|celebrating|angry` để lọc trạng thái mascot (Đang nghỉ,
+Thức giấc, Ăn mừng, Gặp lỗi). Bỏ qua hoặc để trống để xem tất cả. Bộ lọc kết hợp
+với `search`, `provider`, `status` và được áp dụng trước phân trang; `pagination.total`
+là tổng số kết quả phù hợp, còn `summary` vẫn thống kê toàn bộ tài khoản.
+Trạng thái mascot khớp với hình hiển thị, bao gồm lỗi ở log gần nhất của lượt
+đang chạy và trạng thái nghỉ khi chờ lịch chạy lại.
 
 Các bộ lọc là tùy chọn. `page >= 1`; `pageSize` từ 1 đến 100. Tìm kiếm áp dụng
 cho căn cước/tên worker. Response `200`:
@@ -458,10 +492,21 @@ nhận đầy đủ `name`, `enabled`, `address`, `username` và mật khẩu t�
 }
 ```
 
-`name` dài 1–100 ký tự. `address` là URI HTTP/HTTPS có host và port, không chứa
-thông tin đăng nhập trong URL hoặc đường dẫn. Khi sửa, bỏ `password` để giữ
+`name` dài 1–100 ký tự. `address` có thể là URI HTTP/HTTPS/SOCKS5 có host và port (1–65535),
+không chứa thông tin đăng nhập trong URL hoặc đường dẫn, hoặc chuỗi nhà cung cấp
+`host:port:username:password` (cũng chấp nhận tiền tố `http://`, `https://` hoặc `socks5://`).
+Chuỗi nhà cung cấp được chuẩn hóa thành URI theo giao thức đã nhập (mặc định HTTP) và
+username/password tách riêng trước khi lưu; password có thể chứa dấu `:`.
+Host IPv6 trong chuỗi này phải đặt trong ngoặc vuông, ví dụ
+`[2001:db8::1]:29087:proxy-user:example-password`. Khi sửa, bỏ `password` để giữ
 mật khẩu của **chính cấu hình đang sửa**. Cấu hình mới không kế thừa mật khẩu
 cấu hình khác. Gửi `clearPassword: true` để xóa mật khẩu đang lưu.
+
+Ví dụ proxy SOCKS5 không cần username/password: `address: "socks5://160.250.166.18:11548"`,
+`username: ""` và bỏ trường `password` khi tạo mới. Dùng **SocksPort**, không dùng
+cổng HTTP của nhà cung cấp. Khi sửa cấu hình đang có mật khẩu sang không xác thực,
+gửi thêm `clearPassword: true`. Kiểm tra kết nối và các phiên LMS đều đi qua
+SOCKS5, kể cả phân giải tên miền đích; kết quả kiểm tra trả IP đầu ra tại thời điểm đó.
 
 `expiresOn` là ngày `YYYY-MM-DD` hoặc `null`. Khi sửa, bỏ trường này giữ ngày
 cũ; gửi `null` để bỏ hạn. Ngày phải tồn tại trong lịch (không nhận 30/02).

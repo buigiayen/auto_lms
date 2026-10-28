@@ -1,0 +1,23 @@
+# Build artefacts
+**/bin/
+**/obj/
+
+# Secrets must never end up in the build context
+.env
+**/.env
+deploys/backups/
+**/.lotuslms/
+client/data/
+client/node_modules/
+
+# WinForms client and web assets are not part of the worker image
+LotusLMSClient/
+LotusLMSClient.sln
+truongson.huelms.com/
+
+# Repo noise
+.git/
+.gitignore
+*.md
+dotnet-install.ps1
+**/appsettings.Development.json

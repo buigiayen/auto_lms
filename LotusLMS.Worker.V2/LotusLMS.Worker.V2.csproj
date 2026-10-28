@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>LotusLMS.Worker.V2-9d72e365-dae9-4ce0-9452-f3915556ecdd</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+    <InternalsVisibleTo Include="LotusLMS.Worker.V2.Tests" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../LotusLMS.Api/LotusLMS.Api.csproj" />
+    <ProjectReference Include="../LotusLMS.Client/LotusLMS.Client.csproj" />
+    <ProjectReference Include="../LotusLMS.Http/LotusLMS.Http.csproj" />
+  </ItemGroup>
+</Project>

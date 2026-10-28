@@ -1,0 +1,77 @@
+[
+  {
+    "authenticationToken": "fixture-token",
+    "timestampUnixSeconds": 0,
+    "clientSyncToken": "n:581080003f0a000000003f0a"
+  },
+  {
+    "authenticationToken": "fixture-token",
+    "timestampUnixSeconds": 1,
+    "clientSyncToken": "n:840dbdf03f0a000000003f0a"
+  },
+  {
+    "authenticationToken": "fixture-token",
+    "timestampUnixSeconds": 1792226400,
+    "clientSyncToken": "n:855f597e7d77108318003f0a"
+  },
+  {
+    "authenticationToken": "fixture-token",
+    "timestampUnixSeconds": 2147483647,
+    "clientSyncToken": "n:8562fddf8ee9aff4f7c03f0a"
+  },
+  {
+    "authenticationToken": "fixture-token",
+    "timestampUnixSeconds": 4294967296,
+    "clientSyncToken": "n:856dfff03f0a000000003f0a"
+  },
+  {
+    "authenticationToken": "another-token",
+    "timestampUnixSeconds": 0,
+    "clientSyncToken": "n:71a680002c3e000000002c3e"
+  },
+  {
+    "authenticationToken": "another-token",
+    "timestampUnixSeconds": 1,
+    "clientSyncToken": "n:aa6b8b302c3e000000002c3e"
+  },
+  {
+    "authenticationToken": "another-token",
+    "timestampUnixSeconds": 1792226400,
+    "clientSyncToken": "n:ac1f3d1a54e7154f38002c3e"
+  },
+  {
+    "authenticationToken": "another-token",
+    "timestampUnixSeconds": 2147483647,
+    "clientSyncToken": "n:ac23f05f48f1e3142cc02c3e"
+  },
+  {
+    "authenticationToken": "another-token",
+    "timestampUnixSeconds": 4294967296,
+    "clientSyncToken": "n:ac3225302c3e000000002c3e"
+  },
+  {
+    "authenticationToken": "khóa-kiểm-thử",
+    "timestampUnixSeconds": 0,
+    "clientSyncToken": "n:5dd200005ea6000000005ea6"
+  },
+  {
+    "authenticationToken": "khóa-kiểm-thử",
+    "timestampUnixSeconds": 1,
+    "clientSyncToken": "n:8caf45c05ea6000000005ea6"
+  },
+  {
+    "authenticationToken": "khóa-kiểm-thử",
+    "timestampUnixSeconds": 1792226400,
+    "clientSyncToken": "n:8e16f22df0fa119760005ea6"
+  },
+  {
+    "authenticationToken": "khóa-kiểm-thử",
+    "timestampUnixSeconds": 2147483647,
+    "clientSyncToken": "n:8e1ad37fa302bb7517005ea6"
+  },
+  {
+    "authenticationToken": "khóa-kiểm-thử",
+    "timestampUnixSeconds": 4294967296,
+    "clientSyncToken": "n:8e268dc05ea6000000005ea6"
+  }
+]

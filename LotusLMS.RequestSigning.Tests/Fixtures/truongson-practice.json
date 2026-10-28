@@ -1,0 +1,899 @@
+{
+  "source_sha256": "9c80c464598ff7b6db345fd227548462b464f0525c4f187d49df450775fe4ab5",
+  "source_ordinals": [
+    60,
+    61,
+    62,
+    63,
+    70,
+    113
+  ],
+  "sanitization": "Account/session fields and question text removed; business IDs replaced consistently. Timing, answer flags, KPI values and response shapes retained.",
+  "responses": {
+    "/practice/api/recalculate-course-practice-progress": {
+      "success": true,
+      "result": {
+        "11": {
+          "p": "0",
+          "cp": "100",
+          "tll": 1792397133
+        }
+      }
+    },
+    "/practice/api/get-practice-detail": {
+      "success": true,
+      "result": {
+        "exam_sco_iid": 33,
+        "cp_calculation_method": "based_on_kpi_time_of_each_question",
+        "min_learning_time": 10800,
+        "_expand": {
+          "exam_sco": {
+            "iid": 33,
+            "question_banks": [
+              55
+            ],
+            "template_details": [
+              {
+                "exercise_template": [
+                  {
+                    "exam_template_iid": 44
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "/practice/api/get-question-bank-status": {
+      "success": true,
+      "result": {
+        "questions": {
+          "result": [
+            {
+              "iid": "har-question-1",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 95,
+              "mc_answers": [
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-2",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 179,
+              "mc_answers": [
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 1
+                }
+              ]
+            },
+            {
+              "iid": "har-question-3",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 136,
+              "mc_answers": [
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-4",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 137,
+              "mc_answers": [
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 1
+                }
+              ]
+            },
+            {
+              "iid": "har-question-5",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 216,
+              "mc_answers": [
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 1
+                }
+              ]
+            },
+            {
+              "iid": "har-question-6",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 96,
+              "mc_answers": [
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-7",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 107,
+              "mc_answers": [
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 1
+                }
+              ]
+            },
+            {
+              "iid": "har-question-8",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 59,
+              "mc_answers": [
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-9",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 63,
+              "mc_answers": [
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-10",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 57,
+              "mc_answers": [
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 1
+                }
+              ]
+            },
+            {
+              "iid": "har-question-11",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 75,
+              "mc_answers": [
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-12",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 113,
+              "mc_answers": [
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-13",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 88,
+              "mc_answers": [
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-14",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 72,
+              "mc_answers": [
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-15",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 121,
+              "mc_answers": [
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-16",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 100,
+              "mc_answers": [
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-17",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 102,
+              "mc_answers": [
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 1
+                }
+              ]
+            },
+            {
+              "iid": "har-question-18",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 88,
+              "mc_answers": [
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-19",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 53,
+              "mc_answers": [
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 1
+                }
+              ]
+            },
+            {
+              "iid": "har-question-20",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 66,
+              "mc_answers": [
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-21",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 102,
+              "mc_answers": [
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 1
+                },
+                {
+                  "is_answer": 0
+                }
+              ]
+            },
+            {
+              "iid": "har-question-22",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 73,
+              "mc_answers": [
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 1
+                }
+              ]
+            },
+            {
+              "iid": "har-question-23",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 113,
+              "mc_answers": [
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 1
+                }
+              ]
+            },
+            {
+              "iid": "har-question-24",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 135,
+              "mc_answers": [
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 1
+                }
+              ]
+            },
+            {
+              "iid": "har-question-25",
+              "type": 2,
+              "tags": [
+                "Văn hóa, đạo đức nghề nghiệp người lái xe"
+              ],
+              "kpi_time": 143,
+              "mc_answers": [
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 0
+                },
+                {
+                  "is_answer": 1
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "/practice/api/get-sync-practice-progress": {
+      "success": true,
+      "result": {
+        "id": "har-history-id",
+        "sync_data": [
+          {
+            "iid": "har-question-23",
+            "touched": 13,
+            "correct": 4,
+            "incorrect": 9,
+            "last": "incorrect",
+            "spentTime": 37.522999999999996,
+            "score": 4,
+            "percent": "0",
+            "weighted": "1",
+            "gained_kpi_time": "1.023"
+          },
+          {
+            "iid": "har-question-17",
+            "touched": 10,
+            "correct": 6,
+            "incorrect": 4,
+            "last": "correct",
+            "spentTime": 39.992000000000004,
+            "score": 6,
+            "percent": "0",
+            "weighted": "1",
+            "gained_kpi_time": "0.492"
+          },
+          {
+            "iid": "har-question-24",
+            "touched": 14,
+            "correct": 5,
+            "incorrect": 9,
+            "last": "incorrect",
+            "spentTime": 50.498000000000005,
+            "score": 5,
+            "percent": "0",
+            "weighted": "1",
+            "gained_kpi_time": "0.998"
+          },
+          {
+            "iid": "har-question-11",
+            "touched": 8,
+            "correct": 8,
+            "incorrect": 0,
+            "last": "correct",
+            "spentTime": 98.00999999999999,
+            "score": 8,
+            "percent": "1",
+            "weighted": "1",
+            "gained_kpi_time": 75
+          },
+          {
+            "iid": "har-question-14",
+            "touched": 13,
+            "correct": 4,
+            "incorrect": 9,
+            "last": "correct",
+            "spentTime": 42.492000000000004,
+            "score": 4,
+            "percent": "0",
+            "weighted": "1",
+            "gained_kpi_time": "0.492"
+          },
+          {
+            "iid": "har-question-9",
+            "touched": 8,
+            "correct": 7,
+            "score": 7,
+            "incorrect": 1,
+            "spentTime": 21,
+            "last": "correct"
+          },
+          {
+            "iid": "har-question-1",
+            "touched": 9,
+            "correct": 5,
+            "score": 5,
+            "incorrect": 4,
+            "spentTime": 20.5,
+            "last": "correct"
+          },
+          {
+            "iid": "har-question-20",
+            "touched": 9,
+            "correct": 7,
+            "score": 7,
+            "incorrect": 2,
+            "spentTime": 229.5,
+            "last": "correct"
+          },
+          {
+            "iid": "har-question-7",
+            "touched": 13,
+            "correct": 6,
+            "score": 6,
+            "incorrect": 7,
+            "spentTime": 25,
+            "last": "incorrect"
+          },
+          {
+            "iid": "har-question-10",
+            "touched": 14,
+            "correct": 4,
+            "score": 4,
+            "incorrect": 10,
+            "spentTime": 55.5,
+            "last": "incorrect"
+          },
+          {
+            "iid": "har-question-16",
+            "touched": 6,
+            "correct": 5,
+            "score": 5,
+            "incorrect": 1,
+            "spentTime": 27,
+            "last": "correct"
+          },
+          {
+            "iid": "har-question-18",
+            "touched": 8,
+            "correct": 8,
+            "score": 8,
+            "incorrect": 0,
+            "spentTime": 27.5,
+            "last": "correct"
+          },
+          {
+            "iid": "har-question-13",
+            "touched": 8,
+            "correct": 8,
+            "score": 8,
+            "incorrect": 0,
+            "spentTime": 50,
+            "last": "correct"
+          },
+          {
+            "iid": "har-question-21",
+            "touched": 11,
+            "correct": 4,
+            "score": 4,
+            "incorrect": 7,
+            "spentTime": 45.5,
+            "last": "correct"
+          },
+          {
+            "iid": "har-question-3",
+            "touched": 8,
+            "correct": 5,
+            "score": 5,
+            "incorrect": 3,
+            "spentTime": 74.5,
+            "last": "correct"
+          },
+          {
+            "iid": "har-question-4",
+            "touched": 13,
+            "correct": 5,
+            "score": 5,
+            "incorrect": 8,
+            "spentTime": 35.5,
+            "last": "incorrect"
+          },
+          {
+            "iid": "har-question-8",
+            "touched": 10,
+            "correct": 7,
+            "score": 7,
+            "incorrect": 3,
+            "spentTime": 25,
+            "last": "correct"
+          },
+          {
+            "iid": "har-question-15",
+            "touched": 8,
+            "correct": 6,
+            "score": 6,
+            "incorrect": 2,
+            "spentTime": 31,
+            "last": "correct"
+          },
+          {
+            "iid": "har-question-19",
+            "touched": 10,
+            "correct": 6,
+            "score": 6,
+            "incorrect": 4,
+            "spentTime": 33,
+            "last": "incorrect"
+          },
+          {
+            "iid": "har-question-2",
+            "touched": 14,
+            "correct": 3,
+            "score": 3,
+            "incorrect": 11,
+            "spentTime": 78,
+            "last": "correct"
+          },
+          {
+            "iid": "har-question-6",
+            "touched": 7,
+            "correct": 4,
+            "score": 4,
+            "incorrect": 3,
+            "spentTime": 42,
+            "last": "incorrect"
+          },
+          {
+            "iid": "har-question-12",
+            "touched": 8,
+            "correct": 8,
+            "score": 8,
+            "incorrect": 0,
+            "spentTime": 19,
+            "last": "correct"
+          },
+          {
+            "iid": "har-question-5",
+            "touched": 14,
+            "correct": 4,
+            "score": 4,
+            "incorrect": 10,
+            "spentTime": 72,
+            "last": "correct"
+          },
+          {
+            "iid": "har-question-25",
+            "touched": 15,
+            "correct": 5,
+            "score": 5,
+            "incorrect": 10,
+            "spentTime": 124,
+            "last": "incorrect"
+          },
+          {
+            "iid": "har-question-22",
+            "touched": 12,
+            "correct": 6,
+            "score": 6,
+            "incorrect": 6,
+            "spentTime": 56,
+            "last": "correct"
+          },
+          {
+            "iid": "",
+            "touched": "",
+            "correct": "",
+            "score": "",
+            "incorrect": "",
+            "spentTime": 0,
+            "last": ""
+          }
+        ],
+        "practice_iid": 11,
+        "exam_sco_iid": 33
+      }
+    },
+    "/practice/api/start-practice": {
+      "success": true,
+      "result": {
+        "takeinfo": [],
+        "ts": 1792397138,
+        "updated_ts": 1792397138,
+        "timestart": 1792397138,
+        "timeused": 0,
+        "finished": 0,
+        "doing_when_overtime": 1,
+        "id": "har-fresh-take",
+        "course_iid": 22,
+        "practice_iid": 11,
+        "exam_sco_iid": 33
+      }
+    },
+    "/practice/api/save-take": {
+      "success": true,
+      "result": {
+        "question_ids": [
+          "har-question-7",
+          "har-question-9",
+          "har-question-2",
+          "har-question-20",
+          "har-question-8"
+        ],
+        "already_overtime_before_this_api": true,
+        "take_is_finished_automatically_by_server": 0,
+        "reason_server_finish_practice_take_automatically": null,
+        "you_have_just_gained": 0,
+        "id": "har-fresh-take"
+      }
+    }
+  },
+  "save_form": {
+    "take_id": "har-fresh-take",
+    "take_info[0][iid]": "har-question-7",
+    "take_info[0][touched]": "1",
+    "take_info[0][correct]": "0",
+    "take_info[0][incorrect]": "1",
+    "take_info[0][last]": "incorrect",
+    "take_info[0][spentTime]": "128.514",
+    "take_info[0][score]": "0",
+    "take_info[0][percent]": "0",
+    "take_info[0][weighted]": "1",
+    "take_info[1][iid]": "har-question-9",
+    "take_info[1][touched]": "1",
+    "take_info[1][correct]": "1",
+    "take_info[1][incorrect]": "0",
+    "take_info[1][last]": "correct",
+    "take_info[1][spentTime]": "2.005",
+    "take_info[1][score]": "1.00",
+    "take_info[1][percent]": "1",
+    "take_info[1][weighted]": "1",
+    "take_info[2][iid]": "har-question-2",
+    "take_info[2][touched]": "1",
+    "take_info[2][correct]": "0",
+    "take_info[2][incorrect]": "1",
+    "take_info[2][last]": "incorrect",
+    "take_info[2][spentTime]": "1.502",
+    "take_info[2][score]": "0",
+    "take_info[2][percent]": "0",
+    "take_info[2][weighted]": "1",
+    "take_info[3][iid]": "har-question-20",
+    "take_info[3][touched]": "1",
+    "take_info[3][correct]": "1",
+    "take_info[3][incorrect]": "0",
+    "take_info[3][last]": "correct",
+    "take_info[3][spentTime]": "1.998",
+    "take_info[3][score]": "1.00",
+    "take_info[3][percent]": "1",
+    "take_info[3][weighted]": "1",
+    "take_info[4][iid]": "har-question-8",
+    "take_info[4][touched]": "1",
+    "take_info[4][correct]": "0",
+    "take_info[4][incorrect]": "1",
+    "take_info[4][last]": "incorrect",
+    "take_info[4][spentTime]": "2",
+    "take_info[4][score]": "0",
+    "take_info[4][percent]": "0",
+    "take_info[4][weighted]": "1",
+    "finished": "0",
+    "time_start": "1792397133",
+    "time_used": "136.01500000000001",
+    "score": "2",
+    "paper_score": "5",
+    "question_category": "Văn hóa, đạo đức nghề nghiệp người lái xe",
+    "exam_sco_iid": "33",
+    "practice_iid": "11",
+    "course_iid": "22",
+    "should_save_progress_for_course": "true",
+    "spent_time_each_question[har-question-7][doing]": "127021",
+    "spent_time_each_question[har-question-7][viewkey]": "1493",
+    "spent_time_each_question[har-question-9][doing]": "1001",
+    "spent_time_each_question[har-question-9][viewkey]": "1004",
+    "spent_time_each_question[har-question-2][doing]": "503",
+    "spent_time_each_question[har-question-2][viewkey]": "999",
+    "spent_time_each_question[har-question-20][doing]": "494",
+    "spent_time_each_question[har-question-20][viewkey]": "1504",
+    "spent_time_each_question[har-question-8][doing]": "1003",
+    "spent_time_each_question[har-question-8][viewkey]": "997",
+    "submit": "1",
+    "allow_cache_api_cdn": "1",
+    "lang": "vn"
+  }
+}

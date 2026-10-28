@@ -1,0 +1,70 @@
+name: lotuslms
+
+services:
+  client:
+    image: ${IMAGE_PREFIX:-ghcr.io/buigiayen/auto_lms}-client:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    environment:
+      NODE_ENV: production
+      PORT: "3100"
+      CLIENT_HOST: client
+      CLIENT_ALLOWED_HOSTS: ${CLIENT_ALLOWED_HOSTS:-}
+      CLIENT_LISTEN_HOST: 0.0.0.0
+      CLIENT_DATA_DIR: /app/data
+      CLIENT_USERNAME: ${CLIENT_USERNAME:?Set CLIENT_USERNAME in deploys/.env}
+      CLIENT_PASSWORD: ${CLIENT_PASSWORD:?Set CLIENT_PASSWORD in deploys/.env}
+      CLIENT_SESSION_SECURE: ${CLIENT_SESSION_SECURE:-false}
+      WORKER_REGISTRATION_KEY: ${WORKER_REGISTRATION_KEY:?Set WORKER_REGISTRATION_KEY in deploys/.env}
+    ports:
+      - "${CLIENT_BIND_ADDRESS:-127.0.0.1}:${CLIENT_PORT:-3100}:3100"
+    volumes:
+      - client-data:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3100/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  worker:
+    image: ${IMAGE_PREFIX:-ghcr.io/buigiayen/auto_lms}-worker-v2:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
+    depends_on:
+      client:
+        condition: service_healthy
+    deploy:
+      replicas: ${REPLICAS:-1}
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      Client__BaseUrl: http://client:3100
+      Client__RequestTimeoutSeconds: ${CLIENT_REQUEST_TIMEOUT_SECONDS:-10}
+      Worker__WorkerName: ${WORKER_NAME:-worker-v2}
+      Worker__ServerName: ${SERVER_NAME:-}
+      Worker__MaxConcurrentAccounts: ${MAX_CONCURRENT_ACCOUNTS:-5}
+      Worker__RegistrationApiKey: ${WORKER_REGISTRATION_KEY:?Set WORKER_REGISTRATION_KEY in deploys/.env}
+      Worker__PollIntervalSeconds: ${POLL_INTERVAL_SECONDS:-5}
+      Worker__HeartbeatIntervalSeconds: ${HEARTBEAT_INTERVAL_SECONDS:-5}
+      Worker__StopOnDailyKpi: ${STOP_ON_DAILY_KPI:-true}
+      Worker__IncludePractice: ${INCLUDE_PRACTICE:-false}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  client-data:
+    name: ${CLIENT_DATA_VOLUME:-lotuslms-client-data}

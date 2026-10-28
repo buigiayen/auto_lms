@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LotusLMS.Api\LotusLMS.Api.csproj" />
+    <ProjectReference Include="..\LotusLMS.RequestSigning\LotusLMS.RequestSigning.csproj" />
+    <None Include="Fixtures/cryptojs-vectors.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures/client-sync-vectors.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures/truongson-practice.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -6,6 +6,7 @@ import { AppError, requireValue } from './errors.js';
 import { isProxyExpired, proxyExpiresAt } from './proxy-expiry.js';
 import { WorkerQueue } from './worker-queue.js';
 import { accountMood } from '../public/account-mood.js';
+import { validateRunSections } from './run-sections.js';
 
 const providers = ['yenthuy', 'truongson'];
 const now = () => new Date().toISOString();
@@ -34,6 +35,7 @@ const publicAccount = (row, at) => ({
   status: row.status, workerName: row.worker_name, hasPassword: Boolean(row.password_ciphertext),
   managingTeacher: row.managing_teacher,
   enrolmentPlanIid: row.enrolment_plan_iid, enrolmentPlanName: row.enrolment_plan_name,
+  runSections: JSON.parse(row.run_sections_json),
   proxyId: row.proxy_id ?? null,
   proxy: row.proxy_id ? { id: row.proxy_id, name: row.proxy_name, address: row.proxy_address, enabled: Boolean(row.proxy_enabled),
     expiresOn: row.proxy_expires_on, isExpired: isProxyExpired(row.proxy_expires_on, at) } : null,
@@ -83,7 +85,12 @@ export class Store {
       } catch (error) { this.db.exec('ROLLBACK'); throw error;       }
     }
     this.migrateWorkerDeferral();
-    this.db.exec('PRAGMA user_version=8');
+    if (!accountColumns.includes('run_sections_json')) {
+      const backup = join(directory, 'client.before-run-sections.sqlite');
+      if (!existsSync(backup)) this.db.prepare('VACUUM INTO ?').run(backup);
+      this.db.exec(`ALTER TABLE accounts ADD COLUMN run_sections_json TEXT NOT NULL DEFAULT '["exam","review","theory","practical"]'`);
+    }
+    this.db.exec('PRAGMA user_version=9');
     this.queue = new WorkerQueue(this, { dailyResumeOffsetSeconds });
     this.workerKeyFile = join(directory, 'worker-api-keys.json');
     this.workerKeys = Object.assign(Object.create(null), existsSync(this.workerKeyFile) ? JSON.parse(readFileSync(this.workerKeyFile, 'utf8')) : {});
@@ -294,14 +301,18 @@ export class Store {
     return this.account(accountId);
   }
 
-  setStatus(id, status, selectedProxyId, selectedPlan) {
-    return this.queue.transaction(() => this.updateStatus(id, status, selectedProxyId, selectedPlan));
+  setStatus(id, status, selectedProxyId, selectedPlan, selectedSections) {
+    return this.queue.transaction(() => this.updateStatus(id, status, selectedProxyId, selectedPlan, selectedSections));
   }
 
-  updateStatus(id, status, selectedProxyId, selectedPlan) {
+  updateStatus(id, status, selectedProxyId, selectedPlan, selectedSections) {
     this.queue.reap();
     requireValue(['running', 'stopped'].includes(status), 'Trạng thái không hợp lệ.', 'status');
     const current = this.rawAccount(id);
+    requireValue(selectedSections === undefined || status === 'running', 'Chỉ chọn phần cần chạy khi chạy tài khoản.', 'runSections');
+    const runSections = validateRunSections(selectedSections === undefined ? JSON.parse(current.run_sections_json) : selectedSections);
+    if (this.queue.active(id) && JSON.stringify(runSections) !== current.run_sections_json)
+      throw new AppError(409, 'ACCOUNT_BUSY', 'Chờ Worker dừng trước khi đổi phần cần chạy.');
     requireValue(selectedProxyId === undefined || status === 'running', 'Chỉ chọn proxy khi chạy tài khoản.', 'proxyId');
     const proxyId = selectedProxyId === undefined ? current.proxy_id : selectedProxyId;
     requireValue(proxyId === null || (typeof proxyId === 'string' && proxyId.length > 0), 'Chọn proxy hợp lệ hoặc kết nối trực tiếp.', 'proxyId');
@@ -317,8 +328,8 @@ export class Store {
     const planIid = selectedPlan?.enrolmentPlanIid ?? current.enrolment_plan_iid;
     const planName = selectedPlan?.enrolmentPlanName ?? current.enrolment_plan_name;
     if (status === 'stopped') this.db.prepare("UPDATE worker_runs SET state='stopping' WHERE account_id=? AND state IN ('accepted','running')").run(id);
-    this.db.prepare('UPDATE accounts SET status=?,proxy_id=?,enrolment_plan_iid=?,enrolment_plan_name=?,available_after=NULL,updated_at=? WHERE id=?')
-      .run(status, proxyId, planIid, planName, now(), id);
+    this.db.prepare('UPDATE accounts SET status=?,proxy_id=?,enrolment_plan_iid=?,enrolment_plan_name=?,run_sections_json=?,available_after=NULL,updated_at=? WHERE id=?')
+      .run(status, proxyId, planIid, planName, JSON.stringify(runSections), now(), id);
     return this.account(id);
   }
 

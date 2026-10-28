@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     managing_teacher TEXT NOT NULL DEFAULT '' CHECK (length(managing_teacher) <= 200),
     enrolment_plan_iid INTEGER CHECK(enrolment_plan_iid BETWEEN 1 AND 2147483647),
     enrolment_plan_name TEXT NOT NULL DEFAULT '',
+    run_sections_json TEXT NOT NULL DEFAULT '["exam","review","theory","practical"]',
     device_uuid TEXT NOT NULL CHECK (length(device_uuid) = 36),
     proxy_id TEXT REFERENCES proxies(id) ON DELETE RESTRICT,
     available_after TEXT,

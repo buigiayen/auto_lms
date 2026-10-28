@@ -1,4 +1,5 @@
 using LotusLMS.Api;
+using LotusLMS.Client;
 
 namespace LotusLMS.Worker.V2.LotusRunner.CheckingTime;
 
@@ -20,8 +21,8 @@ public sealed class LearningTimeTrackingService(
             110,
             cancellationToken: token);
         var kpiMessage = $"[KPI]: {DateTime.Now} =======> " +
-            $"{todayKpiTime.TodayGainedKpiTime.TotalGainedKpiTimeInSeconds} / " +
-            $"{todayKpiTime.TodayGainedKpiTime.MaxGainedKpiTimeInSeconds}";
+            $"{todayKpiTime.TodayGainedKpiTime.TotalGainedKpiTimeInSeconds / 3600} / " +
+            $"{todayKpiTime.TodayGainedKpiTime.MaxGainedKpiTimeInSeconds / 3600}";
         logger.LogInformation("{Message}", kpiMessage);
         await sendClientLog(kpiMessage, token);
 
@@ -38,8 +39,12 @@ public sealed class LearningTimeTrackingService(
         LotusLmsSession lotusLmsSession,
         int IID_enrolment_plan,
         Func<string, CancellationToken, Task> sendClientLog,
-        CancellationToken token)
+        CancellationToken token,
+        IReadOnlyCollection<string>? runSections = null)
     {
+        var sections = runSections ?? ClientRunSections.All;
+        if (!ClientRunSections.IsValid(sections))
+            throw new InvalidDataException("Chọn ít nhất một phần cần chạy hợp lệ.");
         logger.LogInformation("---- Lấy báo cáo tiến độ cần học.");
         var ideaAutoStudy = await client.GetStudentCoursesAsync(lotusLmsSession, IID_enrolment_plan, cancellationToken: token);
         var listCourse = GetLeafStudyItems(ideaAutoStudy);
@@ -70,11 +75,15 @@ public sealed class LearningTimeTrackingService(
             autoStudy.typeAutoStudy = item.Name?.Contains("Mô phỏng các tình huống giao thông", StringComparison.CurrentCultureIgnoreCase) == true
                                     ? CheckingTimeDTO.TypeAutoStudy.PracticeSpecialOnly
                                     : CheckingTimeDTO.TypeAutoStudy.PracticeOnly;
+            var section = autoStudy.typeAutoStudy == CheckingTimeDTO.TypeAutoStudy.PracticeSpecialOnly
+                ? ClientRunSections.Practical : ClientRunSections.Review;
+            if (!sections.Contains(section)) continue;
             autoStudies.Add(autoStudy);
         }
 
         ///Lý thuyết
-        var TheoryIsNotPass = FillterCourse(leafStudy, "Xem giáo trình");
+        var TheoryIsNotPass = sections.Contains(ClientRunSections.Theory)
+            ? FillterCourse(leafStudy, "Xem giáo trình") : [];
         foreach (var item in TheoryIsNotPass)
         {
             var theoryItems = await client.GetDetailLearningTimeAsync(
@@ -99,7 +108,8 @@ public sealed class LearningTimeTrackingService(
         }
 
         ///Kiểm tra
-        var exam = FillterCourse(leafStudy, "Kiểm tra");
+        var exam = sections.Contains(ClientRunSections.Exam)
+            ? FillterCourse(leafStudy, "Kiểm tra") : [];
         foreach (var item in exam)
         {
             CheckingTimeDTO.AutoStudy autoStudy = new CheckingTimeDTO.AutoStudy();
@@ -110,8 +120,10 @@ public sealed class LearningTimeTrackingService(
         }
 
         string NotiMessage = @$" {DateTime.Now}
+                                -- Phần cần chạy: {string.Join(", ", sections)}
                                 -- Theo phân tích số bài học cần phải thực hiện là 
-                                -- trong đó có ôn luyện còn {practiceNotPass.Count()}/{listCourse.Count()}
+                                -- trong đó có ôn luyện còn {autoStudies.Count(item => item.typeAutoStudy == CheckingTimeDTO.TypeAutoStudy.PracticeOnly)}/{listCourse.Count()}
+                                -- trong đó có thực hành mô phỏng còn {autoStudies.Count(item => item.typeAutoStudy == CheckingTimeDTO.TypeAutoStudy.PracticeSpecialOnly)}/{listCourse.Count()}
                                 -- trong đó có Lý thuyết tự học còn {TheoryIsNotPass.Count()}/{listCourse.Count() - 1}
                                 -- Trong đó kiểm tra còn {exam.Count()}/{listCourse.Count()}";
         logger.LogInformation(NotiMessage);

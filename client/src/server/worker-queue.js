@@ -112,6 +112,7 @@ export class WorkerQueue {
     const usable = !selected || (selected.enabled && !selected.isExpired);
     return { accountId: account.id, workerName: run.worker_name, status: account.status === 'running' && run.state !== 'stopping' && usable ? 'running' : 'stopped',
       enrolmentPlanIid: account.enrolment_plan_iid, enrolmentPlanName: account.enrolment_plan_name,
+      runSections: JSON.parse(account.run_sections_json),
       runId: run.id, state: run.state, serverTime: this.now(), leaseExpiresAt: run.lease_expires_at,
       proxy: selected ? { id: selected.id, enabled: selected.enabled && !selected.isExpired, address: selected.address,
         username: selected.username, password: selected.password, expiresAt: selected.expiresAt } : null };

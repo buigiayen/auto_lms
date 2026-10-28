@@ -5,6 +5,30 @@ một account đang Treo từ backend client, duy trì heartbeat, proxy, log và
 LMS riêng. Lane kết thúc account sẽ tiếp tục polling; lỗi ở một lane không hủy
 các lane còn lại.
 
+## Lọc phần cần chạy
+
+Trong hộp thoại **Chạy tài khoản**, chọn một hoặc nhiều phần: Kiểm tra, Ôn luyện,
+Lý thuyết, Thực hành (mô phỏng). Client lưu `runSections` theo account và gửi qua
+claim/heartbeat/control. Worker truyền lựa chọn vào `CheckingTimeService.Runner`
+và giữ nguyên bộ lọc trong mọi lần tải lại kế hoạch. Khi bỏ chọn lý thuyết,
+worker cũng bỏ các request đọc chi tiết bài lý thuyết.
+
+| `runSections` | Loại nội dung trong kế hoạch |
+| --- | --- |
+| `exam` | `Exam` |
+| `review` | `PracticeOnly` |
+| `theory` | `AutoStudy` |
+| `practical` | `PracticeSpecialOnly` (mô phỏng các tình huống giao thông) |
+
+Hiện worker thực thi ôn luyện thường và lý thuyết. Kiểm tra và mô phỏng chỉ được
+lọc trong kế hoạch; nếu còn bài thuộc hai phần này, worker ghi log chưa hỗ trợ
+và giữ kết quả chưa hoàn tất. Hoàn thành riêng các phần đã chọn trả kết quả
+`SelectedSectionsCompleted`, với log khác hoàn thành cả chương trình.
+Kiểm tra KPI trong ngày vẫn áp dụng cho mọi lựa chọn. Account cũ mặc định chọn
+cả bốn phần; bộ lọc đã lưu được dùng lại khi chạy lần sau hoặc sau lịch hoãn KPI.
+
+Triển khai lại cả client và worker để sử dụng bộ lọc này.
+
 ## Cấu hình tối thiểu
 
 ```json

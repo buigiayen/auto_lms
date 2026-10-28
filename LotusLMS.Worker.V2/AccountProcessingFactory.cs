@@ -72,6 +72,7 @@ internal sealed class AccountProcessingFactory(
             client,
             clock,
             workerOptions,
+            learningTime,
             loggerFactory.CreateLogger<TheoryServices>());
         var proxyIpChecker = new ProxyIpChecker(proxyProvider);
         var checkingTime = new CheckingTimeService(

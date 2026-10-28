@@ -38,6 +38,7 @@ internal sealed class AccountRunContext : IDisposable
     public string WorkerName => _assignment.WorkerName;
     public int? EnrolmentPlanIid => _assignment.EnrolmentPlanIid;
     public string EnrolmentPlanName => _assignment.EnrolmentPlanName;
+    public IReadOnlyList<string> RunSections => _assignment.RunSections;
     public string Provider => _assignment.Provider;
     public bool HasProxy => _proxy is not null;
     public ClientRunOwnership Ownership { get; }
@@ -50,6 +51,7 @@ internal sealed class AccountRunContext : IDisposable
     public string? ValidateConfiguration()
     {
         if (EnrolmentPlanIid is not > 0) return "Account chưa chọn chương trình học. Chọn chương trình rồi nhấn Run lại.";
+        if (!ClientRunSections.IsValid(RunSections)) return "Account chưa chọn phần cần chạy hợp lệ. Chọn ít nhất một phần rồi nhấn Run lại.";
         if (_assignment.Credentials is not { Username.Length: > 0, Password.Length: > 0 } credentials
             || !Guid.TryParse(credentials.DeviceUuid, out _)) return "Account thiếu thông tin đăng nhập hoặc GUID thiết bị hợp lệ.";
         if (Provider is not ("yenthuy" or "truongson") || _assignment.Lms is null
@@ -82,6 +84,9 @@ internal sealed class AccountRunContext : IDisposable
         if (control.State is not ("accepted" or "running")) { Stop("Lượt chạy không còn hoạt động.", true); return; }
         if (control.EnrolmentPlanIid != EnrolmentPlanIid || !SameProxy(control.Proxy, _proxy))
         { Stop("Chương trình hoặc cấu hình proxy đã thay đổi; cần nhận lại account."); return; }
+        if (!ClientRunSections.IsValid(control.RunSections)
+            || !control.RunSections.Order().SequenceEqual(RunSections.Order()))
+        { Stop("Phần cần chạy đã thay đổi; cần nhận lại account."); return; }
         // Count conservatively from request start, excluding response latency and a small margin.
         var lifetime = duration - TimeSpan.FromMilliseconds(250);
         if (_proxy?.ExpiresAt is { } expires && expires - control.ServerTime < lifetime)

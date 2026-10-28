@@ -197,6 +197,32 @@ không được cập nhật qua endpoint này. Response `200` là tài khoản 
 
 ## 5. Thay đổi trạng thái
 
+### Chạy với bộ lọc nội dung
+
+Sau khi tải danh sách chương trình qua `/run-session`, gọi
+`POST /api/accounts/:accountId/run` với header `X-Lms-Session-Id` của phiên đó:
+
+```json
+{
+  "proxyId": null,
+  "enrolmentPlanIid": 99,
+  "runSections": ["review", "theory"]
+}
+```
+
+`runSections` nhận một hoặc nhiều giá trị không trùng: `exam` (kiểm tra),
+`review` (ôn luyện), `theory` (lý thuyết), `practical` (thực hành mô phỏng).
+Mảng rỗng, null, trùng hoặc giá trị lạ trả `400 VALIDATION_ERROR` với
+`fields.runSections`; dữ liệu account giữ nguyên. Bỏ trường này giữ bộ lọc đã
+lưu, mặc định cả bốn phần cho account mới/cũ chưa đặt bộ lọc.
+
+Response account, danh sách chờ Worker, claim, heartbeat và control đều có
+`runSections`. Thay đổi bộ lọc khi còn lượt chạy hoạt động trả `409 ACCOUNT_BUSY`.
+Worker hiện thực thi ôn luyện và lý thuyết; kiểm tra/mô phỏng được lọc trong kế
+hoạch và ghi log chưa hỗ trợ thực thi khi vẫn còn bài cần xử lý.
+
+### Dừng hoặc chạy lại với cấu hình đã lưu
+
 `PATCH /api/accounts/:accountId/status`
 
 ```json

@@ -203,10 +203,11 @@ export function createApp({
         }
         if (action === '/run' && method === 'POST') {
           const input = await readJson(req);
-          requireValue(Object.keys(input).length === 2 && ['proxyId', 'enrolmentPlanIid'].every(key => Object.hasOwn(input, key)),
-            'Gửi proxyId và enrolmentPlanIid để chạy.');
+          requireValue(['proxyId', 'enrolmentPlanIid'].every(key => Object.hasOwn(input, key))
+            && Object.keys(input).every(key => ['proxyId', 'enrolmentPlanIid', 'runSections'].includes(key)),
+            'Gửi proxyId, enrolmentPlanIid và runSections để chạy.');
           const selected = lms.runSelection(id, req.headers['x-lms-session-id'], input);
-          const data = store.setStatus(id, 'running', input.proxyId, selected);
+          const data = store.setStatus(id, 'running', input.proxyId, selected, input.runSections);
           lms.invalidate(id); send(200, { data }); return;
         }
         if (action === '/lms/session' && method === 'POST') { send(201, { data: await lms.login(id) }); return; }

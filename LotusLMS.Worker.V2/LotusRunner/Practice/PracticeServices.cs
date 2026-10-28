@@ -93,9 +93,9 @@ public class PracticeServices(
             // Refresh the pending practice list instead of recursively starting
             // another RunAsync call while this invocation is still active.
             var refreshedPlan = await Callback();
-            if (refreshedPlan.IsCompleted)
+            if (refreshedPlan.CompletionResult != AccountStudyResult.Pending)
             {
-                return AccountStudyResult.Completed;
+                return refreshedPlan.CompletionResult;
             }
 
             pendingPractices = refreshedPlan.Items

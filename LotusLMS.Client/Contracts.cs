@@ -28,6 +28,7 @@ public sealed class ClientAccount
     public string ManagingTeacher { get; init; } = "";
     public int? EnrolmentPlanIid { get; init; }
     public string EnrolmentPlanName { get; init; } = "";
+    public IReadOnlyList<string> RunSections { get; init; } = ClientRunSections.All;
     public string WorkerName { get; init; } = "";
     public string Status { get; init; } = "";
     public string? ProxyId { get; init; }
@@ -87,6 +88,7 @@ public class ClientRunControl
 {
     public int? EnrolmentPlanIid { get; init; }
     public string EnrolmentPlanName { get; init; } = "";
+    public IReadOnlyList<string> RunSections { get; init; } = ClientRunSections.All;
     public string AccountId { get; init; } = "";
     public string WorkerName { get; init; } = "";
     public string RunId { get; init; } = "";

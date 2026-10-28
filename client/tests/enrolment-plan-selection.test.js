@@ -7,8 +7,71 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { Store } from '../src/server/store.js';
 import { createApp } from '../src/server/app.js';
+import { allRunSections } from '../src/server/run-sections.js';
 const input = { identityNumber: '000000000001', password: 'fixture-password', provider: 'truongson' };
 const temp = () => mkdtempSync(join(tmpdir(), 'lotus-plan-'));
+
+test('run sections are validated, saved with Run, and sent through every worker response', async () => {
+  const ctx = await setup(); const { app, call, read } = ctx;
+  try {
+    const account = app.store.saveAccount(input);
+    const { headers } = await read(account.id, null);
+    assert.deepEqual(account.runSections, allRunSections, 'new accounts retain the previous all-sections behavior');
+    const target = { proxyId: null, enrolmentPlanIid: 99 };
+    for (const runSections of [null, [], 'theory', ['unknown'], ['theory', 'theory'], [1], { theory: true }]) {
+      const result = await call(`/api/accounts/${account.id}/run`, 'POST', { ...target, runSections }, headers);
+      assert.equal(result.status, 400);
+      assert.ok(result.error.fields.runSections);
+      assert.equal(app.store.account(account.id).status, 'stopped');
+      assert.equal(app.store.account(account.id).enrolmentPlanIid, null);
+      assert.deepEqual(app.store.account(account.id).runSections, allRunSections);
+    }
+    const chosen = ['exam', 'theory'];
+    const result = await call(`/api/accounts/${account.id}/run`, 'POST', { ...target, runSections: [...chosen].reverse() }, headers);
+    assert.equal(result.status, 200);
+    assert.deepEqual(result.data.runSections, chosen, 'selection uses a stable order');
+    app.store.ensureWorker('section-worker');
+    const worker = { Authorization: `Bearer ${app.store.workerKeys['section-worker']}` };
+    const available = (await call('/api/worker/accounts', 'GET', undefined, worker)).data[0];
+    const assignment = (await call(`/api/worker/accounts/${account.id}/claim`, 'POST', {
+      workerName: 'section-worker', instanceId: randomUUID(), requestId: randomUUID()
+    }, worker)).data;
+    const owner = { runId: assignment.runId, instanceId: assignment.instanceId, leaseToken: assignment.leaseToken };
+    const heartbeat = (await call(`/api/worker/accounts/${account.id}/heartbeat`, 'POST', owner, worker)).data;
+    const control = (await call(`/api/worker/accounts/${account.id}/control`, 'GET', undefined, {
+      ...worker, 'X-Worker-Run-Id': owner.runId, 'X-Worker-Instance-Id': owner.instanceId, 'X-Worker-Lease-Token': owner.leaseToken
+    })).data;
+    for (const response of [available, assignment, heartbeat, control]) assert.deepEqual(response.runSections, chosen);
+    assert.throws(() => app.store.setStatus(account.id, 'running', null, undefined, ['review']), e => e.code === 'ACCOUNT_BUSY');
+    assert.deepEqual(app.store.account(account.id).runSections, chosen);
+    await call(`/api/accounts/${account.id}/status`, 'PATCH', { status: 'stopped' });
+    await call(`/api/worker/accounts/${account.id}/finish`, 'POST', { ...owner, outcome: 'stopped' }, worker);
+    const next = await read(account.id, null);
+    assert.deepEqual((await call(`/api/accounts/${account.id}/run`, 'POST', target, next.headers)).data.runSections, chosen,
+      'older clients that omit runSections preserve the stored selection');
+  } finally { await ctx.close(); }
+});
+
+test('schema 8 migrates run sections to all and persists later choices without changing account identity', () => {
+  const directory = temp(); let store = new Store(directory);
+  try {
+    const account = store.saveAccount(input), device = store.rawAccount(account.id).device_uuid;
+    store.close();
+    const db = new DatabaseSync(join(directory, 'client.sqlite'));
+    db.exec('ALTER TABLE accounts DROP COLUMN run_sections_json');
+    db.exec('PRAGMA user_version=8'); db.close();
+    store = new Store(directory);
+    assert.ok(existsSync(join(directory, 'client.before-run-sections.sqlite')));
+    assert.deepEqual(store.account(account.id).runSections, allRunSections);
+    assert.equal(store.rawAccount(account.id).device_uuid, device);
+    assert.equal(store.decrypt(store.rawAccount(account.id).password_ciphertext), input.password);
+    store.setStatus(account.id, 'running', null, { enrolmentPlanIid: 99, enrolmentPlanName: 'Plan' }, ['review']);
+    store.close(); store = new Store(directory);
+    assert.deepEqual(store.account(account.id).runSections, ['review']);
+    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 9);
+    assert.deepEqual(store.db.prepare('PRAGMA foreign_key_check').all(), []);
+  } finally { store.close(); rmSync(directory, { recursive: true }); }
+});
 async function setup(clock) {
   const directory = temp(), calls = [];
   const app = createApp({ adminAuth: null, directory, clock, lmsOptions: { fetcher: async (url, options) => {
@@ -148,7 +211,7 @@ for (const legacyVersion of [5, 6]) test(`schema ${legacyVersion} to 7 preserves
     store.setStatus(account.id, 'running', null, { enrolmentPlanIid: 100, enrolmentPlanName: 'Chương trình B' });
     store.close(); store = new Store(directory);
     assert.equal(store.account(account.id).enrolmentPlanIid, 100); assert.equal(store.account(account.id).enrolmentPlanName, 'Chương trình B');
-    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 8);
+    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 9);
     assert.equal(store.db.prepare('PRAGMA foreign_key_check').all().length, 0);
   } finally { store.close(); rmSync(directory, { recursive: true }); }
 });

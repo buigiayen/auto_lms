@@ -185,4 +185,16 @@ xóa thời gian hoãn.
 
 Migration sao lưu vào `client.before-worker-deferral.sqlite`, thêm cột
 `available_after` và mở rộng trạng thái kết thúc của `worker_runs` bằng
-`deferred`, giữ nguyên các lượt và log cũ. `user_version` hiện tại là 8.
+`deferred`, giữ nguyên các lượt và log cũ.
+
+## 11. Phần cần chạy (schema 9)
+
+`accounts.run_sections_json` lưu mảng JSON gồm các giá trị `exam`, `review`,
+`theory`, `practical`. Mảng phải có ít nhất một giá trị, không trùng và không có
+giá trị ngoài danh sách. Mặc định là cả bốn phần để giữ hành vi account cũ.
+
+Migration sao lưu vào `client.before-run-sections.sqlite` rồi thêm cột, giữ
+nguyên thông tin đăng nhập, thiết bị, chương trình, lượt chạy và log.
+Run lưu bộ lọc cùng proxy, chương trình và trạng thái trong một transaction.
+Không được đổi bộ lọc khi còn lượt chạy đang hoạt động. Dừng account và lịch
+hoãn KPI giữ nguyên bộ lọc. `user_version` hiện tại là 9.

@@ -9,6 +9,7 @@ public sealed class TheoryServices(
     ILotusLmsApiClient client,
     TimeProvider timeProvider,
     IOptions<WorkerOptions> workerOptions,
+    LearningTimeTrackingService learningTimeTrackingService,
     ILogger<TheoryServices> logger)
 {
     public async Task<AccountStudyResult> RunAsync(
@@ -56,6 +57,7 @@ public sealed class TheoryServices(
 
                 foreach (var plannedItem in courseItems)
                 {
+
                     cancellationToken.ThrowIfCancellationRequested();
                     if (!nodes.TryGetValue(plannedItem.iid, out var node))
                     {
@@ -152,6 +154,7 @@ public sealed class TheoryServices(
                                 },
                                 cancellationToken);
                         }
+                        await learningTimeTrackingService.TrackAsync(session, cancellationToken, sendClientLog);
                     }
 
                     var completedMessage = $"Đã hoàn thành bài lý thuyết: {plannedItem.name} (course={courseIid} item={current.Iid}).";
@@ -161,9 +164,9 @@ public sealed class TheoryServices(
             }
 
             var refreshedPlan = await refreshStudyPlan();
-            if (refreshedPlan.IsCompleted)
+            if (refreshedPlan.CompletionResult != AccountStudyResult.Pending)
             {
-                return AccountStudyResult.Completed;
+                return refreshedPlan.CompletionResult;
             }
 
             pending = GetTheoryItems(refreshedPlan.Items);
@@ -174,9 +177,7 @@ public sealed class TheoryServices(
         }
 
         var finalPlan = await refreshStudyPlan();
-        return finalPlan.IsCompleted
-            ? AccountStudyResult.Completed
-            : AccountStudyResult.Pending;
+        return finalPlan.CompletionResult;
     }
 
     private static List<CheckingTimeDTO.AutoStudy> GetTheoryItems(

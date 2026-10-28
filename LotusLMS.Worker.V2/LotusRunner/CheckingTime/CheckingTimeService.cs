@@ -1,4 +1,5 @@
 using LotusLMS.Api;
+using LotusLMS.Client;
 using LotusLMS.Worker.V2.Accounts;
 using LotusLMS.Worker.V2.LotusRunner.Theory;
 namespace LotusLMS.Worker.V2.LotusRunner.CheckingTime;
@@ -15,8 +16,12 @@ internal sealed class CheckingTimeService(ILotusLmsApiClient client,
         int IID_enrolment_plan,
         bool hasProxy,
         Func<string, CancellationToken, Task> sendClientLog,
-        CancellationToken token)
+        CancellationToken token,
+        IReadOnlyCollection<string>? runSections = null)
     {
+        var sections = runSections ?? ClientRunSections.All;
+        if (!ClientRunSections.IsValid(sections))
+            throw new InvalidDataException("Chọn ít nhất một phần cần chạy hợp lệ.");
         var lotusLmsSession = await CretificateAccountAsync(loginRequest, token);
         if (hasProxy)
         {
@@ -31,47 +36,51 @@ internal sealed class CheckingTimeService(ILotusLmsApiClient client,
             return AccountStudyResult.DailyKpiReached;
         }
 
-        var studyPlan = await learningTimeTrackingService.IdeaAutoStudy(
-            lotusLmsSession,
-            IID_enrolment_plan,
-            sendClientLog,
-            token);
-        if (studyPlan.IsCompleted)
+        Task<StudyPlan> RefreshStudyPlan() => learningTimeTrackingService.IdeaAutoStudy(
+            lotusLmsSession, IID_enrolment_plan, sendClientLog, token, sections);
+
+        var studyPlan = await RefreshStudyPlan();
+        if (studyPlan.CompletionResult != AccountStudyResult.Pending)
         {
-            return AccountStudyResult.Completed;
+            return studyPlan.CompletionResult;
         }
 
-        var practiceResult = await practiceServices.RunAsync(
-            lotusLmsSession,
-            studyPlan.Items,
-            async () => await learningTimeTrackingService.IdeaAutoStudy(lotusLmsSession, IID_enrolment_plan, sendClientLog, token),
-            sendClientLog,
-            token);
-        if (practiceResult == AccountStudyResult.DailyKpiReached)
+        if (sections.Contains(ClientRunSections.Review))
         {
-            return practiceResult;
-        }
-
-        var refreshedPlan = await learningTimeTrackingService.IdeaAutoStudy(
-            lotusLmsSession,
-            IID_enrolment_plan,
-            sendClientLog,
-            token);
-        if (refreshedPlan.IsCompleted)
-        {
-            return AccountStudyResult.Completed;
-        }
-
-        return await theoryServices.RunAsync(
-            lotusLmsSession,
-            refreshedPlan.Items,
-            () => learningTimeTrackingService.IdeaAutoStudy(
+            var practiceResult = await practiceServices.RunAsync(
                 lotusLmsSession,
-                IID_enrolment_plan,
+                studyPlan.Items,
+                RefreshStudyPlan,
                 sendClientLog,
-                token),
-            sendClientLog,
-            token);
+                token);
+            if (practiceResult != AccountStudyResult.Pending)
+            {
+                return practiceResult;
+            }
+        }
+
+        var refreshedPlan = await RefreshStudyPlan();
+        if (refreshedPlan.CompletionResult != AccountStudyResult.Pending)
+        {
+            return refreshedPlan.CompletionResult;
+        }
+
+        if (refreshedPlan.Items.Any(item => item.typeAutoStudy is
+                CheckingTimeDTO.TypeAutoStudy.Exam or CheckingTimeDTO.TypeAutoStudy.PracticeSpecialOnly))
+        {
+            const string message = "Phần kiểm tra hoặc thực hành mô phỏng đã chọn còn bài chưa hoàn thành; worker chưa hỗ trợ thực thi các phần này.";
+            logger.LogInformation("{Message}", message);
+            await sendClientLog(message, token);
+        }
+
+        return sections.Contains(ClientRunSections.Theory)
+            ? await theoryServices.RunAsync(
+                lotusLmsSession,
+                refreshedPlan.Items,
+                RefreshStudyPlan,
+                sendClientLog,
+                token)
+            : AccountStudyResult.Pending;
     }
 
     public async Task<LotusLmsSession> CretificateAccountAsync(LotusLmsLoginRequest lotusLmsLoginRequest, CancellationToken token)

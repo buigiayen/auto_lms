@@ -79,6 +79,11 @@ với dịch vụ khác vì SDK cấu hình BaseAddress và Timeout của nó.
 Đã bỏ `CourseIid`, `CourseName`. Mã null nghĩa là account cũ chưa chọn chương trình. `ClientAssignment`
 có Credentials, Lms, Proxy riêng; không cần tham chiếu DTO của project Worker.
 
+`ClientAccount`, `ClientRunControl` và `ClientAssignment` có thêm `RunSections`
+(`IReadOnlyList<string>`): `exam`, `review`, `theory`, `practical`. Các hằng số và
+kiểm tra hợp lệ nằm trong `ClientRunSections`. Response cũ thiếu trường này mặc
+định chọn tất cả; danh sách rỗng, giá trị lạ hoặc trùng bị Worker từ chối.
+
 Ví dụ nhận một học viên, minh họa gọi SDK theo từng bước:
 
 ```csharp

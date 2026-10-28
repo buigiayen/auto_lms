@@ -12,6 +12,15 @@ const escape = (value) =>
   );
 const providerName = (provider) =>
   provider === "yenthuy" ? "Yên Thủy" : "Trường Sơn";
+const runSectionNames = {
+  exam: "Kiểm tra",
+  review: "Ôn luyện",
+  theory: "Lý thuyết",
+  practical: "Thực hành (mô phỏng)",
+};
+const runSectionSummary = (account) =>
+  (account.runSections ?? Object.keys(runSectionNames))
+    .map((section) => runSectionNames[section]).filter(Boolean).join(", ");
 const date = (value) =>
   value
     ? new Intl.DateTimeFormat("vi-VN", {
@@ -164,6 +173,7 @@ function accountInformation(account) {
     ["Trạng thái", account.status === "running" ? "Treo" : "Dừng treo"],
     ["Hoạt động", executionLabels[execution?.state] || "Đã dừng"],
     ["Chương trình", account.enrolmentPlanIid ? `${account.enrolmentPlanName || "Chương trình học"} · IID ${account.enrolmentPlanIid}` : "Chưa chọn"],
+    ["Phần cần chạy", runSectionSummary(account)],
     ["Proxy", account.proxy ? `${account.proxy.name} · ${account.proxy.address}${account.proxy.enabled ? "" : " · Đang tắt"}` : "Kết nối trực tiếp"],
     ...(account.proxy ? [["Hạn proxy", account.proxy.expiresOn || "Chưa đặt"]] : []),
     ["Mật khẩu", account.hasPassword ? "Đã lưu, được mã hóa" : "Chưa lưu"],
@@ -347,6 +357,8 @@ function runAccount(account) {
     `${account.identityNumber} · ${providerName(account.provider)}`,
     `<form id="run-form"><div class="dialog-body"><p class="field-help">Chọn proxy, tải danh sách và chọn chương trình học muốn chạy.</p><fieldset class="proxy-picker"><legend>1. Kết nối</legend><div id="run-proxy">${spinner("Đang tải proxy còn hạn…")}</div></fieldset><section class="run-plan-panel"><div class="run-plan-heading"><div><h3>2. Chương trình học cần chạy</h3><p>Đăng nhập tài khoản bằng kết nối đã chọn để đọc chương trình học.</p></div><button type="button" class="button small" id="load-run-plans" disabled>${icon("refresh")}Tải chương trình</button></div><div id="run-plan-status" class="field-help" role="status">Chưa tải danh sách chương trình học.</div><div id="run-plan-fields" hidden><label>Chương trình học<select id="run-plan" required><option value="">Chọn chương trình học…</option></select></label><button type="button" class="button small run-more" id="run-more-plans" hidden>Tải thêm chương trình</button><p class="run-plan-summary" id="run-plan-summary" role="status"></p></div></section><div id="run-error" class="inline-error" role="alert" hidden></div></div><div class="dialog-footer"><button type="button" class="button" data-close>Hủy</button><button class="button primary" type="submit" disabled>${icon("play")}Chạy tài khoản</button></div></form>`,
   );
+  $("#run-error").insertAdjacentHTML("beforebegin",
+    `<fieldset class="proxy-picker run-sections"><legend>3. Phần cần chạy</legend><p class="field-help">Chọn ít nhất một phần. Worker chỉ xử lý nội dung đã chọn.</p><div class="run-section-options">${Object.entries(runSectionNames).map(([value, label]) => `<label class="checkbox-label"><input type="checkbox" name="runSections" value="${value}"${(account.runSections ?? Object.keys(runSectionNames)).includes(value) ? " checked" : ""}>${label}</label>`).join("")}</div><p class="field-help">Kiểm tra và thực hành hiện chỉ được lọc trong kế hoạch; worker chưa có luồng thực thi hai phần này.</p></fieldset>`);
   const modal = {
     type: "run",
     epoch,
@@ -361,6 +373,9 @@ function runAccount(account) {
   const button = $("#run-form button[type=submit]"),
     loadButton = $("#load-run-plans");
   const selectedProxy = () => $("#run-proxy input:checked")?.value || null;
+  const selectedSections = () =>
+    [...document.querySelectorAll('#run-form input[name="runSections"]:checked')]
+      .map((input) => input.value);
   const release = (sessionId) =>
     sessionId &&
     api(`/api/accounts/${account.id}/lms/session`, {
@@ -388,7 +403,7 @@ function runAccount(account) {
     const plan = modal.plans.find(
       (item) => item.iid === Number($("#run-plan").value),
     );
-    button.disabled = !plan || !modal.sessionId;
+    button.disabled = !plan || !modal.sessionId || !selectedSections().length;
     $("#run-plan-summary").textContent = plan
       ? `Sẽ chạy: ${plan.name} · IID ${plan.iid}`
       : "";
@@ -474,6 +489,7 @@ function runAccount(account) {
     errorBox("#run-error", "");
   };
   $("#run-plan").onchange = selectionChanged;
+  $("#run-form .run-sections").onchange = selectionChanged;
   $("#run-more-plans").onclick = () =>
     loadPlans().catch((error) => {
       if (current() && error.name !== "AbortError")
@@ -492,6 +508,11 @@ function runAccount(account) {
     });
   $("#run-form").addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!selectedSections().length) {
+      errorBox("#run-error", "Chọn ít nhất một phần cần chạy.");
+      selectionChanged();
+      return;
+    }
     button.disabled = true;
     errorBox("#run-error", "");
     try {
@@ -501,10 +522,11 @@ function runAccount(account) {
         body: {
           proxyId: selectedProxy(),
           enrolmentPlanIid: Number($("#run-plan").value),
+          runSections: selectedSections(),
         },
       });
       if (current()) closeDialog();
-      toast("Đã lưu chương trình học và đưa account vào hàng chờ Worker.");
+      toast("Đã lưu chương trình, phần cần chạy và đưa account vào hàng chờ Worker.");
       await loadAccounts();
     } catch (error) {
       if (current()) {

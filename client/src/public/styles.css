@@ -283,6 +283,9 @@
 .login-panel-footer{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:auto;padding-top:50px;color:#88957d;font-size:9px}
 .login-panel-footer svg{width:13px;height:13px;color:#8ea37d}
 .session-user{font-size:11px;color:#526b50;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.run-sections{margin-top:18px}
+.run-section-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media(max-width:420px){.run-section-options{grid-template-columns:1fr}}
 .logout-button{padding:7px 11px;min-height:34px;font-size:10px;background:#f8faf5}
 @media(max-width:1050px){.topbar{gap:12px}.topbar-right{gap:12px}.session-user{max-width:90px}.breadcrumb{white-space:nowrap}.topbar-right .connection{display:none}}
 @media(max-width:760px){.login-page{padding:22px 16px}.login-page .login-shell{grid-template-columns:1fr;min-height:0;max-width:440px;border-radius:17px}.login-story{padding:24px 26px 21px}.login-story .brand{font-size:26px}.login-story .brand-mark{font-size:34px}.login-story .brand-caption{font-size:6px}.login-story-copy{margin-top:25px;max-width:210px;min-height:95px}.login-story-copy h2{font-size:20px;letter-spacing:-.4px;margin:11px 0 0}.login-story-copy p,.login-story-copy .login-eyebrow,.login-story-footer,.login-office-label{display:none}.login-scene{position:absolute;right:9px;bottom:0;margin:0;width:150px}.login-illustration{height:137px}.login-panel{padding:29px 26px 23px}.login-form-heading{margin:0}.login-form-heading .login-eyebrow{font-size:7px}.login-form-heading h1{font-size:30px;margin:11px 0 10px}.login-form-heading p{font-size:11px}.login-panel #login-form{margin-top:25px}.login-panel-footer{padding-top:29px;font-size:8px}.login-help{font-size:9px}.login-story .login-eyebrow{font-size:6px}.topbar .session-user{display:none}.topbar .logout-button{min-height:38px;font-size:9px;padding:8px}.topbar .breadcrumb{font-size:9px}.topbar .breadcrumb span{padding:0 6px}}

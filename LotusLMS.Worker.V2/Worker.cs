@@ -211,12 +211,14 @@ internal sealed class WorkerLane(
                         outcome = result switch
                         {
                             AccountStudyResult.Completed => "completed",
+                            AccountStudyResult.SelectedSectionsCompleted => "completed",
                             AccountStudyResult.DailyKpiReached => "deferred",
                             _ => "failed"
                         };
                         reason = result switch
                         {
                             AccountStudyResult.Completed => "Đã hoàn thành chương trình học.",
+                            AccountStudyResult.SelectedSectionsCompleted => "Đã hoàn thành các phần được chọn chạy.",
                             AccountStudyResult.DailyKpiReached => "Đã đạt KPI trong ngày; account được hẹn chạy lại vào giờ ngẫu nhiên trong khung 00:00–08:00 ngày mai (giờ Việt Nam).",
                             _ => "Quy trình học chưa hoàn tất."
                         };
@@ -303,7 +305,8 @@ internal sealed class WorkerLane(
                     context.EnrolmentPlanIid!.Value,
                     context.HasProxy,
                     (message, cancellationToken) => logs.SendAsync(context, "info", message, cancellationToken),
-                    token);
+                    token,
+                    context.RunSections);
             }
             catch (LotusClientException error) when (BackendErrors.IsTemporary(error)
                 && context.RemainingLease > TimeSpan.FromSeconds(2))

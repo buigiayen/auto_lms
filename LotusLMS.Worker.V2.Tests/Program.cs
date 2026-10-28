@@ -103,6 +103,7 @@ var theorySession = new LotusLmsSession
 
 await KpiResponseChecks.RunAsync(theorySession, Check);
 await StudyLoggingChecks.RunAsync(theorySession, Check);
+await RunSectionChecks.RunAsync(theorySession, Check);
 
 // A valid HTTP/JSON response with an unexpected value type must not become a network error.
 using (var responseHandler = new Fixture((_, _) => Task.FromResult(Fixture.Json(new
@@ -162,6 +163,7 @@ var theoryService = new TheoryServices(
     theoryClient.Client,
     TimeProvider.System,
     Options.Create(new WorkerOptions { SaveItemSeconds = 1 }),
+    new LearningTimeTrackingService(theoryClient.Client, NullLogger<LearningTimeTrackingService>.Instance),
     NullLogger<TheoryServices>.Instance);
 var theoryResult = await theoryService.RunAsync(
     theorySession,
@@ -201,6 +203,7 @@ var kpiTheoryService = new TheoryServices(
         StopOnDailyKpi = true,
         KpiCheckEverySaves = 1
     }),
+    new LearningTimeTrackingService(kpiTheoryClient.Client, NullLogger<LearningTimeTrackingService>.Instance),
     NullLogger<TheoryServices>.Instance);
 var kpiResult = await kpiTheoryService.RunAsync(
     theorySession,

@@ -6,6 +6,7 @@ public sealed class WorkerOptions
 {
     public const string SectionName = "Worker";
     public string WorkerName { get; set; } = "";
+    public string? ServerName { get; init; }
     public int MaxConcurrentAccounts { get; init; } = 5;
     public string RegistrationApiKey { get; init; } = "";
     public int PollIntervalSeconds { get; init; }
@@ -62,6 +63,8 @@ public sealed class WorkerOptions
             && WorkerName.Length <= 96;
         if (!workerNameIsValid)
             yield return "Worker:WorkerName phải dài 1–96 ký tự, không có khoảng trắng ở hai đầu.";
+        if (workerNameIsValid && GetLaneWorkerName(1).Length > 100)
+            yield return "Tổng tên lane từ Worker:ServerName và Worker:WorkerName không được vượt quá 100 ký tự, gồm cả dấu nối và số thứ tự.";
         if (MaxConcurrentAccounts is < 1 or > 20)
             yield return "Worker:MaxConcurrentAccounts phải từ 1 đến 20.";
         if (RegistrationApiKey.Length < 32)
@@ -72,7 +75,11 @@ public sealed class WorkerOptions
             yield return "Worker:HeartbeatIntervalSeconds phải từ 1 đến 10 giây.";
     }
 
-    internal string GetLaneWorkerName(int lane) => $"{WorkerName}-{lane:00}";
+    private string EffectiveServerName => string.IsNullOrWhiteSpace(ServerName)
+        ? Environment.MachineName
+        : ServerName.Trim();
+
+    internal string GetLaneWorkerName(int lane) => $"{EffectiveServerName}-{WorkerName}-{lane:00}";
 }
 
 internal sealed class WorkerOptionsValidator : IValidateOptions<WorkerOptions>

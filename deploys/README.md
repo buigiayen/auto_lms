@@ -60,6 +60,18 @@ Cookie đăng nhập có thời hạn 12 giờ; đăng xuất hủy ngay, restar
 nhập lại. Khi đổi user/pass, sửa `.env` rồi chạy lại `sh deploy.sh` để tạo lại
 client với cấu hình mới. Worker tiếp tục dùng bootstrap/API key độc lập.
 
+Để Client hiển thị máy chủ đang chạy công việc, đặt trong `.env`:
+
+```dotenv
+SERVER_NAME=server-01
+WORKER_NAME=worker-v2
+```
+
+Worker gửi tên lane dạng `server-01-worker-v2-01`, `server-01-worker-v2-02`…
+Nếu không đặt `SERVER_NAME`, Worker dùng hostname của container. Có thể truyền
+hostname thật từ shell của máy chủ bằng
+`SERVER_NAME="$(hostname)" docker compose up -d --wait --wait-timeout 180`.
+
 Mặc định `STOP_ON_DAILY_KPI=true`: khi đủ KPI ngày, tài khoản được hẹn chạy lại
 vào một thời điểm ngẫu nhiên trong 00:00–08:00 ngày hôm sau theo giờ Việt Nam.
 

@@ -33,6 +33,7 @@ Check(!new WorkerOptions
 var validLaneOptions = new WorkerOptions
 {
     WorkerName = "worker-01",
+    ServerName = "server-a",
     MaxConcurrentAccounts = 2,
     RegistrationApiKey = "fixture-bootstrap-key-0123456789abcdef",
     PollIntervalSeconds = 5,
@@ -40,9 +41,28 @@ var validLaneOptions = new WorkerOptions
 };
 Check(validLaneOptions.IsValid(),
     "minimal worker options are valid");
-Check(validLaneOptions.GetLaneWorkerName(1) == "worker-01-01"
-    && validLaneOptions.GetLaneWorkerName(2) == "worker-01-02",
-    "lane names include the configured worker prefix and a two-digit suffix");
+Check(validLaneOptions.GetLaneWorkerName(1) == "server-a-worker-01-01"
+    && validLaneOptions.GetLaneWorkerName(2) == "server-a-worker-01-02",
+    "lane names include the server, worker prefix and a two-digit suffix");
+Check(new WorkerOptions { WorkerName = "worker-01" }.GetLaneWorkerName(1)
+    == $"{Environment.MachineName}-worker-01-01", "server defaults to the runtime machine name");
+Check(new WorkerOptions { WorkerName = "worker-01", ServerName = "  " }.GetLaneWorkerName(1)
+    == $"{Environment.MachineName}-worker-01-01", "empty Docker server setting uses the runtime machine name");
+Check(new WorkerOptions { WorkerName = "worker-01", ServerName = " server-b " }.GetLaneWorkerName(1)
+    == "server-b-worker-01-01", "configured server names are trimmed");
+foreach (var serverLength in new[] { 87, 88 })
+{
+    var namedOptions = new WorkerOptions
+    {
+        ServerName = new string('s', serverLength), WorkerName = "worker-01",
+        MaxConcurrentAccounts = 20, RegistrationApiKey = "fixture-bootstrap-key-0123456789abcdef",
+        PollIntervalSeconds = 5, HeartbeatIntervalSeconds = 5
+    };
+    Check(namedOptions.GetLaneWorkerName(20).Length == serverLength + 13,
+        "the full registered lane name includes both separators and the lane suffix");
+    Check(namedOptions.IsValid() == (serverLength == 87),
+        "combined server and worker names respect the Client API 100-character boundary");
+}
 Check(!new WorkerOptions
 {
     WorkerName = "worker-01",

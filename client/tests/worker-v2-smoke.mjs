@@ -14,6 +14,7 @@ const directory = mkdtempSync(join(tmpdir(), 'lotus-worker-v2-'));
 let upstreamCalls = 0, dropClaim = true, dropLog = true, dropFinish = true, listRequests = 0, finishRequests = 0;
 let delayedFinishAccount = null, parallelSecondAccount = null, finishResponsePending = false, parallelClaimedDuringFinish = false;
 const registrationKey = 'fixture-worker-registration-key-0123456789abcdef';
+const serverName = 'fixture-server';
 const app = createApp({ adminAuth: { username: 'fixture-admin', password: 'fixture-admin-password' },
   directory,
   workerRegistrationKey: registrationKey,
@@ -61,6 +62,7 @@ function start(name, key, laneCount = 1) {
     DOTNET_ENVIRONMENT: 'Production', DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_CLI_HOME: join(directory, 'dotnet-home'),
     Client__BaseUrl: `http://127.0.0.1:${app.server.address().port}`,
     Client__RequestTimeoutSeconds: laneCount > 1 ? '10' : '2', Worker__WorkerName: workerName,
+    Worker__ServerName: serverName,
     Worker__MaxConcurrentAccounts: String(laneCount), Worker__RegistrationApiKey: key ?? registrationKey,
     Worker__PollIntervalSeconds: '1', Worker__HeartbeatIntervalSeconds: '1',
     Http__Proxy__Enabled: 'false', LotusLms__LogApiResponses: 'false'
@@ -94,8 +96,14 @@ try {
   assert.equal(runs(account.id).length, 1, 'lost claim response cannot create another run');
   assert.equal(ready(account.id).length, 1, 'lost log response must deduplicate the retry');
   const firstRun = runs(account.id)[0];
-  const owner = workers.get(firstRun.worker_name);
-  const idle = workers.get(firstRun.worker_name === 'worker-v2-a-01' ? 'worker-v2-b-01' : 'worker-v2-a-01');
+  assert.ok(firstRun.worker_name.startsWith(`${serverName}-`), 'the actual server is sent with the worker name');
+  assert.equal(app.store.account(account.id).execution.workerName, firstRun.worker_name,
+    'Client exposes the server-qualified name for display');
+  assert.ok(logs(account.id).every(log => log.worker_name === firstRun.worker_name),
+    'all Client logs retain the server-qualified worker name');
+  const ownerName = firstRun.worker_name.slice(serverName.length + 1);
+  const owner = workers.get(ownerName);
+  const idle = workers.get(ownerName === 'worker-v2-a-01' ? 'worker-v2-b-01' : 'worker-v2-a-01');
   assert.equal(JSON.parse(ready(account.id)[0].context_json).enrolmentPlanIid, 99);
   assert.ok(logs(account.id).every(log => log.run_id === firstRun.id));
   await stop(idle);
@@ -120,6 +128,9 @@ try {
   const multiSecond = createAccount('000000000006');
   app.store.setStatus(multiFirst.id, 'running', null, { enrolmentPlanIid: 500, enrolmentPlanName: 'First' });
   app.store.setStatus(multiSecond.id, 'running', null, { enrolmentPlanIid: 600, enrolmentPlanName: 'Second' });
+  // Force queue order: timestamp ties otherwise let the undelayed second account run first.
+  app.store.db.prepare('UPDATE accounts SET updated_at=? WHERE id=?').run('2000-01-01T00:00:00.000Z', multiFirst.id);
+  app.store.db.prepare('UPDATE accounts SET updated_at=? WHERE id=?').run('2000-01-01T00:00:01.000Z', multiSecond.id);
   delayedFinishAccount = multiFirst.id;
   parallelSecondAccount = multiSecond.id;
   const multiLaneWorker = start('worker-v2-multi', undefined, 2);

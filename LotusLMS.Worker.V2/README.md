@@ -23,8 +23,16 @@ các lane còn lại.
 }
 ```
 
-`WorkerName` là tiền tố để tạo tên lane `WorkerName-01` đến
-`WorkerName-<MaxConcurrentAccounts>`. Worker tự gọi `POST /api/workers` cho
+Tên lane gửi về Client có dạng `ServerName-WorkerName-01` đến
+`ServerName-WorkerName-<MaxConcurrentAccounts>`, ví dụ `server-01-worker-v2-01`.
+`Worker:ServerName` không bắt buộc; bỏ trống sẽ dùng `Environment.MachineName`.
+Khi chạy Docker, giá trị tự lấy là hostname của container. Đặt `SERVER_NAME`
+trong `.env` của Docker Compose để gửi tên máy chủ thật, hoặc truyền
+`SERVER_NAME="$(hostname)" docker compose up -d worker` từ shell của máy chủ.
+Tên đầy đủ, gồm cả dấu nối và số thứ tự, phải dài tối đa 100 ký tự.
+Tên này được dùng xuyên suốt đăng ký, claim, log và hiển thị trên Client.
+Đổi tên máy chủ sẽ tạo danh tính lane mới; dữ liệu lượt chạy cũ vẫn giữ tên cũ.
+Worker tự gọi `POST /api/workers` cho
 từng lane lúc khởi động. Client API tạo lane mới hoặc trả lại cùng API key khi
 lane đã tồn tại; Worker giữ các key lane trong bộ nhớ và dùng key riêng khi
 poll/claim. Bạn không cần đăng ký lane thủ công hay cấu hình `LaneApiKeys`.
@@ -43,7 +51,7 @@ dotnet user-secrets set "Worker:RegistrationApiKey" "<secret bootstrap>" --proje
 ```
 
 Base URL mặc định là localhost:3100; đổi `Client:BaseUrl` nếu backend ở nơi khác.
-Biến môi trường có dạng `Worker__WorkerName`,
+Biến môi trường có dạng `Worker__WorkerName`, `Worker__ServerName`,
 `Worker__MaxConcurrentAccounts`, `Worker__RegistrationApiKey` và
 `Client__BaseUrl`. Có thể chạy một lane bằng cách đặt concurrency là 1.
 User Secrets được dùng trong môi trường Development. Không lưu secret bootstrap

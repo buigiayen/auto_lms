@@ -121,6 +121,7 @@ try {
   const workerName = 'fixture-worker';
   const worker = launch({
     Worker__WorkerName: workerName,
+    Worker__ServerName: 'startup-server',
     Worker__MaxConcurrentAccounts: '2',
     Worker__RegistrationApiKey: bootstrapKey,
     Worker__PollIntervalSeconds: '1',
@@ -131,13 +132,14 @@ try {
     while (laneKeys.size < 2 && !worker.exited && Date.now() < deadline)
       await new Promise(resolve => setTimeout(resolve, 40));
     assert.equal(laneKeys.size, 2, 'Worker self-registers all configured lane names');
+    assert.deepEqual([...laneKeys.keys()].sort(), ['startup-server-fixture-worker-01', 'startup-server-fixture-worker-02']);
     assert.ok(authenticated >= 2, 'lane registration is authenticated with the bootstrap key');
 
     const queueDeadline = Date.now() + 5000;
-    while (!worker.output.includes('Lane fixture-worker-02 started') && Date.now() < queueDeadline)
+    while (!worker.output.includes('Lane startup-server-fixture-worker-02 started') && Date.now() < queueDeadline)
       await new Promise(resolve => setTimeout(resolve, 40));
-    assert.ok(worker.output.includes('Lane fixture-worker-01 started'));
-    assert.ok(worker.output.includes('Lane fixture-worker-02 started'));
+    assert.ok(worker.output.includes('Lane startup-server-fixture-worker-01 started'));
+    assert.ok(worker.output.includes('Lane startup-server-fixture-worker-02 started'));
 
     worker.child.kill('SIGTERM');
     assert.equal(await exitWithin(worker), 0);

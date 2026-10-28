@@ -52,6 +52,7 @@ services:
       Client__BaseUrl: http://client:3100
       Client__RequestTimeoutSeconds: ${CLIENT_REQUEST_TIMEOUT_SECONDS:-10}
       Worker__WorkerName: ${WORKER_NAME:-worker-v2}
+      Worker__ServerName: ${SERVER_NAME:-}
       Worker__MaxConcurrentAccounts: ${MAX_CONCURRENT_ACCOUNTS:-5}
       Worker__RegistrationApiKey: ${WORKER_REGISTRATION_KEY:?Set WORKER_REGISTRATION_KEY in deploys/.env}
       Worker__PollIntervalSeconds: ${POLL_INTERVAL_SECONDS:-5}
@@ -67,6 +68,3 @@ services:
 volumes:
   client-data:
     name: ${CLIENT_DATA_VOLUME:-lotuslms-client-data}
-
-network:
-  

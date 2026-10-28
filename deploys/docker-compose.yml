@@ -45,6 +45,8 @@ services:
     depends_on:
       client:
         condition: service_healthy
+    deploy:
+      replicas: ${REPLICAS:-1}
     environment:
       DOTNET_ENVIRONMENT: Production
       Client__BaseUrl: http://client:3100
@@ -65,3 +67,6 @@ services:
 volumes:
   client-data:
     name: ${CLIENT_DATA_VOLUME:-lotuslms-client-data}
+
+network:
+  

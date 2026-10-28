@@ -67,7 +67,7 @@ public sealed class LearningTimeTrackingService(
             autoStudy.name = item.Name;
             autoStudy.iid = item.__Expand?.Syllabus?.children?.FirstOrDefault(c => c?.ntype == "practice")?.iid ?? 0;
             autoStudy.iidRoot = item.Iid;
-            autoStudy.typeAutoStudy = item.Name?.Contains("Mô phòng các tình huống giao thông", StringComparison.CurrentCultureIgnoreCase) == true
+            autoStudy.typeAutoStudy = item.Name?.Contains("Mô phỏng các tình huống giao thông", StringComparison.CurrentCultureIgnoreCase) == true
                                     ? CheckingTimeDTO.TypeAutoStudy.PracticeSpecialOnly
                                     : CheckingTimeDTO.TypeAutoStudy.PracticeOnly;
             autoStudies.Add(autoStudy);

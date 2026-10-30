@@ -11,6 +11,7 @@
     "test:worker": "node tests/worker-smoke.mjs",
     "test:worker-v2": "node tests/worker-v2-smoke.mjs",
     "test:worker-v2-isolation": "node tests/worker-v2-isolation.mjs",
+    "test:worker-v2-rest": "node tests/worker-v2-rest-smoke.mjs",
     "check": "node scripts/check.js"
   },
   "dependencies": { "undici": "8.12.3" }

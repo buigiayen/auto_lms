@@ -1,0 +1,30 @@
+purpose:
+  stands_in_for: Discord Execute Webhook and the Client API registration/polling paths.
+  unblocks: Verify fatal worker/lane notification fanout, bounded retries and deleted-webhook isolation without real accounts or Discord channels.
+assumptions:
+  - id: discord-execute-and-rate-limit-contract
+    status: supported
+    claim: Discord Execute Webhook accepts multipart payload_json/files with wait=true; a 429 communicates its retry delay.
+    reason: The public Discord webhook and rate-limit documentation specifies these request and response fields.
+    verification: Read official documentation on 2026-10-30. The local stand-in models 200, 429, 502 and 404; live delivery remains unverified.
+    source: https://docs.discord.com/developers/resources/webhook#execute-webhook ; https://docs.discord.com/developers/topics/rate-limits
+    updated_at: "2026-10-30"
+  - id: worker-failure-fanout
+    status: supported
+    claim: The real worker sends both fatal lane events and its all-lanes-stopped summary to healthy destinations despite a rate-limited or deleted destination.
+    reason: The real coordinator and two lanes ran against the local Client API stand-in and the real HttpClient sent multipart notifications to the Discord stand-in.
+    verification: On 2026-10-30, the 189-check run with DISCORD_SIMULATION_BASE_URL passed. Simulation request events at 12:43:51-12:43:52 UTC showed two registrations, two permanent polling failures, 502 then success for webhook 111, 429 then success for 222, and one 404 for 333. Counts were 4/4/1 for the three destinations, covering two lane incidents and one worker summary. Reran after adding null-configuration handling; all 190 checks passed with the same delivery counts. Startup and lane-isolation smoke tests also passed against local HTTP stand-ins. This proves the caller against these stand-ins; live Discord remains unverified.
+    source: LotusLMS.Worker.V2.Tests/DiscordSimulationChecks.cs ; postman/mocks/discord-notifications/default.js
+    updated_at: "2026-10-30"
+  - id: live-discord-delivery
+    status: unknown
+    claim: The deployment can reach its configured Discord channels and post diagnostic attachments.
+    reason: No real webhook URLs or deployment network were used. These local mocks were authored from the public contract; no published owner mock was used.
+    verification: Requires a configured real Discord webhook after deployment.
+    source: deploys/.env.example ; LotusLMS.Worker.V2/Notifications/DiscordWorkerNotifier.cs
+    updated_at: "2026-10-30"
+fingerprints:
+  - id: discord-notifications-local
+    date: "2026-10-30"
+    commit: 95b473876a15cd29addad5fa07539f542be1570c (dirty working tree implementing notifications and HTTP diagnostics)
+    cli: Postman CLI 1.82.0

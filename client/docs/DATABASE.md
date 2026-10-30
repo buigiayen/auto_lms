@@ -197,4 +197,16 @@ Migration sao lưu vào `client.before-run-sections.sqlite` rồi thêm cột, g
 nguyên thông tin đăng nhập, thiết bị, chương trình, lượt chạy và log.
 Run lưu bộ lọc cùng proxy, chương trình và trạng thái trong một transaction.
 Không được đổi bộ lọc khi còn lượt chạy đang hoạt động. Dừng account và lịch
-hoãn KPI giữ nguyên bộ lọc. `user_version` hiện tại là 9.
+hoãn KPI giữ nguyên bộ lọc.
+
+## 12. Chu kỳ chạy/nghỉ (schema 10)
+
+`worker_runs.finish_details_json` lưu object JSON gồm `outcome`, `restSeconds`
+và `availableAfter` của receipt kết thúc. `resting` dùng trạng thái SQL
+`deferred` để giữ account Treo trong quãng nghỉ, tương tự cơ chế ẩn hàng chờ
+qua `accounts.available_after`. Outcome KPI `deferred` vẫn có ý nghĩa lịch ngày
+hôm sau; metadata phân biệt hai trường hợp và phát hiện retry mâu thuẫn.
+
+Migration sao lưu vào `client.before-scheduled-rest.sqlite` trước khi thêm cột.
+Run cũ có metadata `{}`, vẫn đối chiếu outcome theo state cũ. Thông tin account,
+khóa, lượt chạy và log được giữ nguyên. `user_version` hiện tại là 10.

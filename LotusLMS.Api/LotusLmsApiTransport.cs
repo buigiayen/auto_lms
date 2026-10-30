@@ -34,8 +34,8 @@ internal sealed class LotusLmsApiTransport(
         LotusLmsProvider? provider = null)
     {
         provider ??= session?.Provider;
-        using var request = CreatePostRequest(endpoint, form, referer, session, provider);
-        var (_, root, _) = await SendAsync(request, endpoint, cancellationToken);
+        using var request = CreatePostRequest(endpoint, form, referer, session, provider, out var diagnostics);
+        var (_, root, _) = await SendAsync(request, endpoint, cancellationToken, diagnostics);
         return root;
     }
 
@@ -49,17 +49,18 @@ internal sealed class LotusLmsApiTransport(
         where TResponse : class
     {
         provider ??= session?.Provider;
-        using var request = CreatePostRequest(endpoint, form, referer, session, provider);
-        var (body, _, statusCode) = await SendAsync(request, endpoint, cancellationToken);
+        using var request = CreatePostRequest(endpoint, form, referer, session, provider, out var diagnostics);
+        var (body, _, statusCode) = await SendAsync(request, endpoint, cancellationToken, diagnostics);
 
         try
         {
             return JsonSerializer.Deserialize<TResponse>(body, ResponseSerializerOptions)
-                ?? throw InvalidJsonResponse(endpoint, statusCode);
+                ?? throw diagnostics.CreateException("invalid_json", "LotusLMS returned an empty or invalid JSON object.", endpoint, statusCode);
         }
         catch (JsonException exception)
         {
-            throw new LotusLmsApiException(
+            throw diagnostics.CreateException(
+                "response_schema",
                 $"LotusLMS response could not be deserialized as {typeof(TResponse).Name} " +
                 $"at JSON path {exception.Path ?? "$"}.",
                 endpoint,
@@ -77,9 +78,9 @@ internal sealed class LotusLmsApiTransport(
     {
         var provider = session.Provider;
         using var content = new MultipartFormDataContent();
-        var fields = options.GenerateRequestTokens
+        var fields = (options.GenerateRequestTokens
             ? SandRequestTokenGenerator.Sign(form, session.UserIid, session.Token)
-            : form;
+            : form).ToArray();
         foreach (var field in fields)
         {
             content.Add(new StringContent(field.Value, System.Text.Encoding.UTF8), field.Key);
@@ -87,7 +88,7 @@ internal sealed class LotusLmsApiTransport(
 
         using var request = new HttpRequestMessage(HttpMethod.Post, BuildRequestUri(endpoint, provider)) { Content = content };
         ApplyRequestHeaders(request, referer, session, provider);
-        var (_, root, _) = await SendAsync(request, endpoint, cancellationToken);
+        var (_, root, _) = await SendAsync(request, endpoint, cancellationToken, new ApiFailureDiagnostics(request, fields, httpClient.BaseAddress));
         return root;
     }
 
@@ -114,7 +115,7 @@ internal sealed class LotusLmsApiTransport(
         var provider = session.Provider;
         using var request = new HttpRequestMessage(HttpMethod.Get, BuildRequestUri(signedEndpoint, provider));
         ApplyRequestHeaders(request, referer, session, provider);
-        var (_, root, _) = await SendAsync(request, endpoint, cancellationToken);
+        var (_, root, _) = await SendAsync(request, endpoint, cancellationToken, new ApiFailureDiagnostics(request, baseAddress: httpClient.BaseAddress));
         return root;
     }
 
@@ -123,15 +124,18 @@ internal sealed class LotusLmsApiTransport(
         IEnumerable<KeyValuePair<string, string>> form,
         string referer,
         LotusLmsSession? session,
-        LotusLmsProvider? provider)
+        LotusLmsProvider? provider,
+        out ApiFailureDiagnostics diagnostics)
     {
+        var fields = (options.GenerateRequestTokens
+            ? SandRequestTokenGenerator.Sign(form, session?.UserIid, session?.Token)
+            : form).ToArray();
         var request = new HttpRequestMessage(HttpMethod.Post, BuildRequestUri(endpoint, provider))
         {
-            Content = new FormUrlEncodedContent(options.GenerateRequestTokens
-                ? SandRequestTokenGenerator.Sign(form, session?.UserIid, session?.Token)
-                : form)
+            Content = new FormUrlEncodedContent(fields)
         };
         ApplyRequestHeaders(request, referer, session, provider);
+        diagnostics = new ApiFailureDiagnostics(request, fields, httpClient.BaseAddress);
         return request;
     }
 
@@ -150,7 +154,8 @@ internal sealed class LotusLmsApiTransport(
     private async Task<(string Body, JsonObject Root, System.Net.HttpStatusCode StatusCode)> SendAsync(
         HttpRequestMessage request,
         string endpoint,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ApiFailureDiagnostics diagnostics)
     {
         HttpResponseMessage response;
         try
@@ -162,14 +167,16 @@ internal sealed class LotusLmsApiTransport(
         }
         catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new LotusLmsApiException(
+            throw diagnostics.CreateException(
+                "timeout",
                 "The LotusLMS request timed out.",
                 endpoint,
                 innerException: exception);
         }
         catch (HttpRequestException exception)
         {
-            throw new LotusLmsApiException(
+            throw diagnostics.CreateException(
+                "network",
                 "The LotusLMS request failed before a valid response was received.",
                 endpoint,
                 exception.StatusCode,
@@ -178,19 +185,33 @@ internal sealed class LotusLmsApiTransport(
 
         using (response)
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            diagnostics.SetResponse(response);
+            string body;
+            try
+            {
+                body = await response.Content.ReadAsStringAsync(cancellationToken);
+            }
+            catch (Exception exception) when (exception is HttpRequestException or IOException
+                || exception is OperationCanceledException && !cancellationToken.IsCancellationRequested)
+            {
+                throw diagnostics.CreateException("response_read", "LotusLMS response body could not be read.",
+                    endpoint, response.StatusCode, innerException: exception);
+            }
             await _responseFileWriter.WriteAsync(
                 request.Method,
                 request.RequestUri,
                 response,
                 body);
 
-            var root = TryParseObject(body);
+            var parsedBody = TryParseBody(body, out var parseError);
+            var root = parsedBody as JsonObject;
+            diagnostics.SetResponse(response, body, parsedBody);
             var serverMessage = ReadServerMessage(root);
 
             if (!response.IsSuccessStatusCode)
             {
-                throw new LotusLmsApiException(
+                throw diagnostics.CreateException(
+                    "http_status",
                     $"LotusLMS returned HTTP {(int)response.StatusCode} ({response.StatusCode}).",
                     endpoint,
                     response.StatusCode,
@@ -199,12 +220,14 @@ internal sealed class LotusLmsApiTransport(
 
             if (root is null)
             {
-                throw InvalidJsonResponse(endpoint, response.StatusCode);
+                throw diagnostics.CreateException("invalid_json", "LotusLMS returned an empty or invalid JSON object.",
+                    endpoint, response.StatusCode, innerException: parseError);
             }
 
             if (TryReadBoolean(root["success"], out var success) && !success)
             {
-                throw new LotusLmsApiException(
+                throw diagnostics.CreateException(
+                    "application_rejected",
                     "LotusLMS rejected the request at the application level.",
                     endpoint,
                     response.StatusCode,
@@ -232,8 +255,9 @@ internal sealed class LotusLmsApiTransport(
         }
     }
 
-    private static JsonObject? TryParseObject(string body)
+    private static JsonNode? TryParseBody(string body, out JsonException? parseError)
     {
+        parseError = null;
         if (string.IsNullOrWhiteSpace(body))
         {
             return null;
@@ -241,21 +265,14 @@ internal sealed class LotusLmsApiTransport(
 
         try
         {
-            return JsonNode.Parse(body) as JsonObject;
+            return JsonNode.Parse(body);
         }
-        catch (JsonException)
+        catch (JsonException error)
         {
+            parseError = error;
             return null;
         }
     }
-
-    private static LotusLmsApiException InvalidJsonResponse(
-        string endpoint,
-        System.Net.HttpStatusCode? statusCode = null) =>
-        new(
-            "LotusLMS returned an empty or invalid JSON object.",
-            endpoint,
-            statusCode);
 
     private static string? ReadServerMessage(JsonObject? root)
     {
@@ -266,11 +283,14 @@ internal sealed class LotusLmsApiTransport(
 
         var message = ReadString(root["message"])
             ?? ReadString(root["error"])
+            ?? ReadString((root["error"] as JsonObject)?["message"])
+            ?? ReadString((root["error"] as JsonObject)?["code"])
             ?? ReadString(root["error_message"])
             ?? ReadString(root["err_code"])
             ?? ReadString(root["error_code"]);
 
-        return message is { Length: > 512 } ? message[..512] : message;
+        // ApiFailureDiagnostics must remove secrets before applying the log length limit.
+        return message;
     }
 
     private static string? ReadString(JsonNode? node)

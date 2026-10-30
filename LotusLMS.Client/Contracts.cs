@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace LotusLMS.Client;
 
 public sealed class ClientAccountQuery
@@ -54,6 +56,8 @@ public sealed class ClientExecution
     public DateTimeOffset? LastHeartbeatAt { get; init; }
     public DateTimeOffset? LeaseExpiresAt { get; init; }
     public ClientActivity? LastLog { get; init; }
+    public DateTimeOffset? AvailableAfter { get; init; }
+    public string? DeferReason { get; init; }
 }
 
 public sealed class ClientActivity
@@ -82,6 +86,8 @@ public class ClientRunOwnership
 public sealed class ClientFinishRequest : ClientRunOwnership
 {
     public required string Outcome { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? RestSeconds { get; init; }
 }
 
 public class ClientRunControl
@@ -154,6 +160,7 @@ public sealed class ClientFinishResult
 {
     public string RunId { get; init; } = "";
     public string State { get; init; } = "";
+    public DateTimeOffset? AvailableAfter { get; init; }
 }
 
 public sealed class ClientWorkerRegistration

@@ -56,7 +56,7 @@ const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
 function launch(overrides) {
   const env = { ...process.env };
-  for (const key of Object.keys(env)) if (/^(Client|Worker)__/i.test(key)) delete env[key];
+  for (const key of Object.keys(env)) if (/^(Client|Worker|Discord)__/i.test(key)) delete env[key];
   const child = spawn('dotnet', [binary], {
     cwd,
     env: {
@@ -64,6 +64,7 @@ function launch(overrides) {
       DOTNET_CLI_HOME: '/tmp/huelms-dotnet-review',
       DOTNET_CLI_TELEMETRY_OPTOUT: '1',
       DOTNET_ENVIRONMENT: 'Production',
+      Discord__Enabled: 'false',
       Client__BaseUrl: baseUrl,
       Worker__PollIntervalSeconds: '1',
       ...overrides
@@ -125,7 +126,9 @@ try {
     Worker__MaxConcurrentAccounts: '2',
     Worker__RegistrationApiKey: bootstrapKey,
     Worker__PollIntervalSeconds: '1',
-    Worker__HeartbeatIntervalSeconds: '1'
+    Worker__HeartbeatIntervalSeconds: '1',
+    Discord__Enabled: 'true',
+    Discord__WebhookUrls: 'https://not-discord.invalid/fixture-discord-url-secret'
   });
   try {
     const deadline = Date.now() + 10000;
@@ -140,6 +143,8 @@ try {
       await new Promise(resolve => setTimeout(resolve, 40));
     assert.ok(worker.output.includes('Lane startup-server-fixture-worker-01 started'));
     assert.ok(worker.output.includes('Lane startup-server-fixture-worker-02 started'));
+    assert.ok(worker.output.includes('Discord:WebhookUrls') && !worker.output.includes('fixture-discord-url-secret'),
+      'invalid notification destinations do not stop healthy lanes or expose their URL');
 
     worker.child.kill('SIGTERM');
     assert.equal(await exitWithin(worker), 0);

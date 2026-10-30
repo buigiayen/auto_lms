@@ -14,9 +14,9 @@ export class WorkerQueue {
     try { const value = action(); this.db.exec('COMMIT'); return value; }
     catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
-  event(run, level, message) {
+  event(run, level, message, details = {}) {
     this.db.prepare('INSERT INTO worker_logs(event_id,account_id,worker_name,run_id,level,message,context_json,occurred_at) VALUES(?,?,?,?,?,?,?,?)')
-      .run(randomUUID(), run.account_id, run.worker_name, run.id, level, message, JSON.stringify({ runId: run.id, source: 'worker-queue' }), this.now());
+      .run(randomUUID(), run.account_id, run.worker_name, run.id, level, message, JSON.stringify({ runId: run.id, source: 'worker-queue', ...details }), this.now());
   }
   reap() {
     const lost = this.db.prepare(`SELECT * FROM worker_runs WHERE ${active} AND lease_expires_at<=?`).all(this.now());
@@ -39,6 +39,7 @@ export class WorkerQueue {
       runId: run?.id ?? null, workerName: run?.worker_name ?? null, lastHeartbeatAt: run?.last_heartbeat_at ?? null,
       leaseExpiresAt: isActive ? run.lease_expires_at : null,
       availableAfter: deferred ? account.available_after : null,
+      deferReason: deferred ? JSON.parse(run?.finish_details_json ?? '{}').outcome === 'resting' ? 'scheduled_break' : 'daily_kpi' : null,
       lastLog: last ? { message: last.message, level: last.level, occurredAt: last.occurred_at } : null };
   }
   available(query, paging) {
@@ -71,7 +72,7 @@ export class WorkerQueue {
       const account = this.store.rawAccount(accountId);
       if (account.status !== 'running') throw new AppError(409, 'ACCOUNT_NOT_QUEUED', 'Account chưa được nhấn Run hoặc đã dừng.');
       if (account.available_after && Date.parse(account.available_after) > this.store.clock())
-        throw new AppError(409, 'ACCOUNT_DEFERRED', 'Account chưa đến lịch chạy lại sau khi đủ KPI trong ngày.');
+        throw new AppError(409, 'ACCOUNT_DEFERRED', 'Account chưa đến lịch chạy lại.');
       this.store.accountProxy(accountId);
       if (this.active(accountId)) throw new AppError(409, 'ACCOUNT_CLAIMED', 'Account đã được Worker khác tiếp nhận.');
       if (this.db.prepare(`SELECT 1 FROM worker_runs WHERE instance_id=? AND ${active}`).get(input.instanceId))
@@ -128,19 +129,31 @@ export class WorkerQueue {
     });
   }
   finish(accountId, workerName, input) {
-    requireValue(['completed','failed','stopped','deferred'].includes(input.outcome), 'outcome phải là completed, failed, stopped hoặc deferred.', 'outcome');
+    requireValue(['completed','failed','stopped','deferred','resting'].includes(input.outcome), 'outcome phải là completed, failed, stopped, deferred hoặc resting.', 'outcome');
+    requireValue(input.outcome === 'resting'
+      ? Number.isSafeInteger(input.restSeconds) && input.restSeconds >= 60 && input.restSeconds <= 86400
+      : input.restSeconds == null, 'restSeconds phải là số nguyên từ 60 đến 86400 và chỉ dùng khi outcome=resting.', 'restSeconds');
+    const state = input.outcome === 'resting' ? 'deferred' : input.outcome;
+    const restSeconds = input.restSeconds ?? null;
     return this.transaction(() => {
       const run = this.verify(accountId, workerName, input, { logs: true });
       if (['completed','failed','stopped','deferred'].includes(run.state)) {
-        if (run.state !== input.outcome) throw new AppError(409, 'RUN_OUTCOME_CONFLICT', 'Lượt chạy đã kết thúc với kết quả khác.');
-        return { runId: run.id, state: run.state };
+        const previous = JSON.parse(run.finish_details_json);
+        if (run.state !== state || (previous.outcome ?? run.state) !== input.outcome
+            || (previous.restSeconds ?? null) !== restSeconds)
+          throw new AppError(409, 'RUN_OUTCOME_CONFLICT', 'Lượt chạy đã kết thúc với kết quả khác.');
+        return { runId: run.id, state: run.state, availableAfter: previous.availableAfter ?? null };
       }
       if (run.state === 'lost') throw new AppError(409, 'LEASE_LOST', 'Lượt chạy đã mất quyền sở hữu.');
-      this.db.prepare('UPDATE worker_runs SET state=?,finished_at=? WHERE id=?').run(input.outcome, this.now(), run.id);
+      const finishedAt = this.now();
       let availableAfter = null;
       // A fresh Run requested during shutdown stays queued after the previous worker acknowledges stopping.
       if (run.state !== 'stopping') {
-        if (input.outcome === 'deferred') {
+        if (input.outcome === 'resting') {
+          availableAfter = new Date(Date.parse(finishedAt) + restSeconds * 1000).toISOString();
+          this.db.prepare('UPDATE accounts SET available_after=?,updated_at=? WHERE id=?')
+            .run(availableAfter, finishedAt, accountId);
+        } else if (input.outcome === 'deferred') {
           const vietnamDate = new Date(this.store.clock() + 7 * 3600000);
           const nextMidnightUtc = Date.UTC(
             vietnamDate.getUTCFullYear(),
@@ -157,15 +170,23 @@ export class WorkerQueue {
             .run(this.now(), accountId);
         }
       }
+      this.db.prepare('UPDATE worker_runs SET state=?,finished_at=?,finish_details_json=? WHERE id=?')
+        .run(state, finishedAt, JSON.stringify({ outcome: input.outcome, restSeconds, availableAfter }), run.id);
+      const resumeText = availableAfter ? new Intl.DateTimeFormat('vi-VN', {
+        timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'medium', hourCycle: 'h23'
+      }).format(new Date(availableAfter)) : null;
       this.event(run, input.outcome === 'failed' ? 'error' : 'info',
-        input.outcome === 'deferred'
+        input.outcome === 'resting'
           ? availableAfter
-            ? `Worker ${workerName} đã đạt KPI trong ngày; account trở lại hàng chờ lúc ${new Intl.DateTimeFormat('vi-VN', {
-              timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'medium', hourCycle: 'h23'
-            }).format(new Date(availableAfter))} (giờ Việt Nam, ngẫu nhiên trong khung 00:00–08:00).`
+            ? `Worker ${workerName} nghỉ theo chu kỳ ${restSeconds} giây; tự chạy lại lúc ${resumeText} (giờ Việt Nam).`
+            : `Worker ${workerName} đã kết thúc phiên để nghỉ; giữ yêu cầu điều khiển hiện tại của account.`
+          : input.outcome === 'deferred'
+          ? availableAfter
+            ? `Worker ${workerName} đã đạt KPI trong ngày; account trở lại hàng chờ lúc ${resumeText} (giờ Việt Nam, ngẫu nhiên trong khung 00:00–08:00).`
             : `Worker ${workerName} đã đạt KPI trong ngày; giữ yêu cầu điều khiển hiện tại của account.`
-          : `Worker ${workerName} kết thúc lượt chạy: ${input.outcome}.`);
-      return { runId: run.id, state: input.outcome };
+          : `Worker ${workerName} kết thúc lượt chạy: ${input.outcome}.`,
+        { outcome: input.outcome, restSeconds, availableAfter });
+      return { runId: run.id, state, availableAfter };
     });
   }
 }

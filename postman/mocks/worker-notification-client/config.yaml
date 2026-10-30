@@ -1,0 +1,10 @@
+version: 1
+name: worker-notification-client
+slug: worker-notification-client
+protocol: http
+interceptRequests: true
+origin: notification-client.invalid
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

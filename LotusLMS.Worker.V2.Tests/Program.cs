@@ -104,6 +104,10 @@ var theorySession = new LotusLmsSession
 await KpiResponseChecks.RunAsync(theorySession, Check);
 await StudyLoggingChecks.RunAsync(theorySession, Check);
 await RunSectionChecks.RunAsync(theorySession, Check);
+await HttpFailureChecks.RunAsync(theorySession, Check);
+await DiscordNotificationChecks.RunAsync(Check);
+await DiscordSimulationChecks.RunAsync(Check);
+WorkRestChecks.Run(Check);
 
 // A valid HTTP/JSON response with an unexpected value type must not become a network error.
 using (var responseHandler = new Fixture((_, _) => Task.FromResult(Fixture.Json(new
@@ -126,6 +130,9 @@ using (var responseHttp = new HttpClient(responseHandler) { BaseAddress = new Ur
         var diagnostic = LmsFailureDiagnostics.Describe(error);
         Check(diagnostic.Contains("HTTP 200") && diagnostic.Contains("JSON") && !diagnostic.Contains('?'),
             "KPI schema errors are diagnosed as HTTP 200 JSON failures without session queries");
+        Check(error.HttpDiagnostics?["failureKind"]?.GetValue<string>() == "response_schema"
+            && error.HttpDiagnostics["causes"]?[0]?["jsonPath"]?.GetValue<string>()?.Contains("total_gained_kpi_time_in_seconds") == true,
+            "schema diagnostics identify the exception path and retain the response body");
     }
 }
 
@@ -144,6 +151,9 @@ using (var timeoutHttp = new HttpClient(timeoutHandler) { BaseAddress = new Uri(
         Check(ReferenceEquals(error.InnerException, timeoutCause)
             && LmsFailureDiagnostics.Describe(error).Contains("hết thời gian chờ"),
             "transport retains timeout cause for worker diagnostics");
+        Check(error.HttpDiagnostics?["failureKind"]?.GetValue<string>() == "timeout"
+            && error.HttpDiagnostics["response"] is null,
+            "timeout diagnostics retain request details without inventing a response");
     }
 }
 

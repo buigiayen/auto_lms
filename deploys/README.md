@@ -75,6 +75,37 @@ hostname thật từ shell của máy chủ bằng
 Mặc định `STOP_ON_DAILY_KPI=true`: khi đủ KPI ngày, tài khoản được hẹn chạy lại
 vào một thời điểm ngẫu nhiên trong 00:00–08:00 ngày hôm sau theo giờ Việt Nam.
 
+Mỗi account cũng có chu kỳ riêng: chạy 3 giờ, nghỉ ngẫu nhiên 15–30 phút rồi
+tự được worker nhận lại với phiên LMS mới. Cấu hình trong `.env`:
+
+```dotenv
+WORK_REST_ENABLED=true
+CONTINUOUS_WORK_MINUTES=180
+MIN_REST_MINUTES=15
+MAX_REST_MINUTES=30
+```
+
+Thời gian tính từ lúc worker nhận account; lịch nghỉ được lưu trong database.
+Các account khác tiếp tục chạy. Dừng thủ công không tự chạy lại; lịch đủ KPI
+vẫn được ưu tiên nếu đạt trước hạn. Đặt `WORK_REST_ENABLED=false` để tắt.
+Triển khai cả image Client và Worker mới vì Client API cần hỗ trợ `resting`
+và tự nâng schema 10 (có bản sao lưu migration).
+
+Để nhận cảnh báo lỗi trên nhiều kênh/server Discord, thêm vào `.env`:
+
+```dotenv
+DISCORD_ENABLED=true
+DISCORD_WEBHOOK_URLS='https://discord.com/api/webhooks/ID1/TOKEN1;https://discord.com/api/webhooks/ID2/TOKEN2'
+DISCORD_EVENTS=worker_failed,lane_failed
+```
+
+Phân cách URL bằng `;`. Mỗi sự cố được gửi tới tất cả webhook hợp lệ. Thêm
+`,account_failed` vào `DISCORD_EVENTS` để nhận cả lỗi account/LMS dù lane vẫn
+tiếp tục chạy. Tin nhắn kèm file JSON chẩn đoán đã che dữ liệu nhạy cảm.
+Giữ URL webhook trong `.env` riêng vì URL có token. Mặc định Discord tắt;
+webhook/cấu hình lỗi không làm dừng worker. Sau khi sửa cấu hình và image đã có
+thay đổi này, chạy lại `sh deploy.sh`.
+
 Nếu image là private, đăng nhập bằng tài khoản được phép đọc package và GitHub
 PAT **classic** có scope `read:packages`:
 

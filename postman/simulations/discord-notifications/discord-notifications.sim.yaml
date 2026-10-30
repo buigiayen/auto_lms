@@ -1,0 +1,11 @@
+simulation: discord-notifications
+routing: path
+mocks:
+  - name: discord-notifications
+    routeKey: discord
+    origin: discord.com
+    path: postman/mocks/discord-notifications
+  - name: worker-notification-client
+    routeKey: client
+    origin: notification-client.invalid
+    path: postman/mocks/worker-notification-client

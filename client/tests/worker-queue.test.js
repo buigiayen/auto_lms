@@ -232,7 +232,7 @@ test('schema upgrade preserves old accounts and logs and backs up before adding 
     assert.equal(store.db.prepare('SELECT message FROM worker_logs').get().message,'Legacy log');
     assert.equal(store.decrypt(store.rawAccount(account.id).password_ciphertext),accountInput.password);
     assert.equal(store.account(account.id).execution.state,'queued');
-    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,9);
+    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version,10);
   }finally{store.close();rmSync(directory,{recursive:true});}
 });
 
@@ -280,7 +280,7 @@ test('worker deferral migration preserves existing runs and restores foreign key
     assert.ok(store.db.prepare('PRAGMA table_info(accounts)').all().some(column => column.name === 'available_after'));
     assert.equal(store.db.prepare('SELECT id,state FROM worker_runs').get().state, 'stopped');
     assert.equal(store.db.prepare('PRAGMA foreign_key_check').all().length, 0);
-    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 9);
+    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 10);
   } finally {
     store.close();
     rmSync(directory, { recursive: true });

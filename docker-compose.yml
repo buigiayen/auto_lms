@@ -49,6 +49,13 @@ services:
       Worker__HeartbeatIntervalSeconds: ${HEARTBEAT_INTERVAL_SECONDS:-5}
       Worker__StopOnDailyKpi: ${STOP_ON_DAILY_KPI:-false}
       Worker__IncludePractice: ${INCLUDE_PRACTICE:-false}
+      Worker__WorkRestEnabled: ${WORK_REST_ENABLED:-true}
+      Worker__ContinuousWorkMinutes: ${CONTINUOUS_WORK_MINUTES:-180}
+      Worker__MinRestMinutes: ${MIN_REST_MINUTES:-15}
+      Worker__MaxRestMinutes: ${MAX_REST_MINUTES:-30}
+      Discord__Enabled: ${DISCORD_ENABLED:-false}
+      Discord__WebhookUrls: "${DISCORD_WEBHOOK_URLS:-}"
+      Discord__Events: "${DISCORD_EVENTS:-worker_failed,lane_failed}"
 
 volumes:
   lotuslms-client-data:

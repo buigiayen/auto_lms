@@ -4,7 +4,8 @@ namespace LotusLMS.Worker.V2.Accounts;
 
 internal sealed class AccountLog(ILotusClient client, TimeProvider clock, ILogger<AccountLog> logger)
 {
-    public async Task SendAsync(AccountRunContext context, string level, string message, CancellationToken token)
+    public async Task SendAsync(AccountRunContext context, string level, string message, CancellationToken token,
+        IReadOnlyDictionary<string, object?>? failure = null)
     {
         var entry = new ClientWorkerLog
         {
@@ -19,6 +20,7 @@ internal sealed class AccountLog(ILotusClient client, TimeProvider clock, ILogge
             Message = message,
             Context = new() { ["enrolmentPlanIid"] = context.EnrolmentPlanIid, ["provider"] = context.Provider, ["source"] = "worker-v2" }
         };
+        if (failure is not null) entry.Context["failure"] = failure;
         logger.Log(level == "error" ? LogLevel.Error : level == "warn" ? LogLevel.Warning : LogLevel.Information,
             "Account {AccountId}, lượt {RunId}: {Message}", context.AccountId, context.Ownership.RunId, message);
         while (true)

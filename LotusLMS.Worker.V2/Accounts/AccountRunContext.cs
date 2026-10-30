@@ -13,6 +13,9 @@ internal sealed class AccountRunContext : IDisposable
     private readonly TimeProvider _clock;
     private readonly CancellationTokenSource _stop = new();
     private readonly ITimer _timer;
+    private ITimer? _restTimer;
+    private readonly long _receivedAt;
+    private int? _scheduledRestSeconds;
     private readonly object _gate = new();
     private bool _disposed;
     private long _deadline;
@@ -27,6 +30,7 @@ internal sealed class AccountRunContext : IDisposable
         _assignment = assignment;
         _proxy = proxy;
         _clock = clock;
+        _receivedAt = requestStarted;
         Ownership = new ClientRunOwnership { RunId = assignment.RunId, InstanceId = instanceId, LeaseToken = assignment.LeaseToken };
         _timer = clock.CreateTimer(_ => CheckDeadline(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _identityNumber = identityNumber;
@@ -45,6 +49,7 @@ internal sealed class AccountRunContext : IDisposable
     public CancellationToken StoppingToken => _stop.Token;
     public string StopReason { get; private set; } = "Đã yêu cầu dừng Worker.";
     public bool LeaseLost { get; private set; }
+    public int? ScheduledRestSeconds { get { lock (_gate) return _scheduledRestSeconds; } }
     public TimeSpan RemainingLease => TimeSpan.FromSeconds(
         (Interlocked.Read(ref _deadline) - _clock.GetTimestamp()) / (double)_clock.TimestampFrequency);
 
@@ -59,6 +64,29 @@ internal sealed class AccountRunContext : IDisposable
             || !ValidUrl(_assignment.Lms.Origin)) return "Cấu hình nhà cung cấp LMS của account không hợp lệ.";
         if (!ValidProxy(_proxy, _assignment.ServerTime)) return "Proxy của account đã tắt, hết hạn hoặc không hợp lệ.";
         return null;
+    }
+
+    public void ScheduleRest(TimeSpan workDuration, int restSeconds)
+    {
+        if (workDuration <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(workDuration));
+        if (restSeconds is < 60 or > 86400) throw new ArgumentOutOfRangeException(nameof(restSeconds));
+        lock (_gate)
+        {
+            if (_disposed || _stop.IsCancellationRequested) return;
+            if (_restTimer is not null) throw new InvalidOperationException("Work period is already scheduled.");
+            _restTimer = _clock.CreateTimer(_ =>
+            {
+                lock (_gate)
+                {
+                    if (_disposed || _stop.IsCancellationRequested) return;
+                    // The first stop reason wins; a manual stop/lease loss is never turned into an auto-resume.
+                    _scheduledRestSeconds = restSeconds;
+                    Stop($"Đã chạy đủ {workDuration.TotalMinutes:0.##} phút; nghỉ {restSeconds / 60d:0.##} phút rồi tự chạy tiếp.");
+                }
+            }, null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            var remaining = workDuration - _clock.GetElapsedTime(_receivedAt);
+            _restTimer.Change(remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero, Timeout.InfiniteTimeSpan);
+        }
     }
 
     public void UpdateControl(ClientRunControl control, long requestStarted)
@@ -103,6 +131,7 @@ internal sealed class AccountRunContext : IDisposable
             StopReason = reason;
             LeaseLost = leaseLost;
             _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            _restTimer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             _stop.Cancel();
         }
     }
@@ -171,6 +200,7 @@ internal sealed class AccountRunContext : IDisposable
             Stop("Lượt chạy đã được giải phóng.");
             _disposed = true;
             _timer.Dispose();
+            _restTimer?.Dispose();
             _stop.Dispose();
         }
     }

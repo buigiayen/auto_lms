@@ -85,12 +85,17 @@ export class Store {
       } catch (error) { this.db.exec('ROLLBACK'); throw error;       }
     }
     this.migrateWorkerDeferral();
+    if (!this.db.prepare('PRAGMA table_info(worker_runs)').all().some(column => column.name === 'finish_details_json')) {
+      const backup = join(directory, 'client.before-scheduled-rest.sqlite');
+      if (!existsSync(backup)) this.db.prepare('VACUUM INTO ?').run(backup);
+      this.db.exec("ALTER TABLE worker_runs ADD COLUMN finish_details_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(finish_details_json) AND json_type(finish_details_json) = 'object')");
+    }
     if (!accountColumns.includes('run_sections_json')) {
       const backup = join(directory, 'client.before-run-sections.sqlite');
       if (!existsSync(backup)) this.db.prepare('VACUUM INTO ?').run(backup);
       this.db.exec(`ALTER TABLE accounts ADD COLUMN run_sections_json TEXT NOT NULL DEFAULT '["exam","review","theory","practical"]'`);
     }
-    this.db.exec('PRAGMA user_version=9');
+    this.db.exec('PRAGMA user_version=10');
     this.queue = new WorkerQueue(this, { dailyResumeOffsetSeconds });
     this.workerKeyFile = join(directory, 'worker-api-keys.json');
     this.workerKeys = Object.assign(Object.create(null), existsSync(this.workerKeyFile) ? JSON.parse(readFileSync(this.workerKeyFile, 'utf8')) : {});

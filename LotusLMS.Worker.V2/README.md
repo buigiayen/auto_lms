@@ -90,6 +90,110 @@ trường cấu hình rồi thoát với mã 1, không để
 Nếu đã sửa file mà vẫn lỗi, kiểm tra User Secrets và biến môi trường vì chúng
 được ưu tiên hơn appsettings.
 
+## Chu kỳ chạy/nghỉ cho từng tài khoản
+
+Mặc định mỗi account chạy tối đa **180 phút**, tính từ lúc được worker nhận,
+rồi nghỉ ngẫu nhiên **15–30 phút** (chọn theo giây). Khi đến hạn, worker hủy
+công việc đang chờ, gửi log cuối, xác nhận `resting` với backend và nhả lane.
+Account vẫn ở trạng thái Treo, hiển thị giờ chạy lại; lane có thể nhận account
+khác trong quãng nghỉ. Đến hạn, account tự vào hàng chờ. Lần nhận tiếp theo tạo
+context, HTTP client/cookie jar và phiên đăng nhập LMS mới, đọc lại tiến độ LMS
+để tiếp tục công việc. Mỗi account có bộ đếm và thời gian nghỉ riêng.
+
+Trong `.env` của Docker Compose:
+
+```dotenv
+WORK_REST_ENABLED=true
+CONTINUOUS_WORK_MINUTES=180
+MIN_REST_MINUTES=15
+MAX_REST_MINUTES=30
+```
+
+Cấu hình .NET tương ứng: `Worker:WorkRestEnabled`, `ContinuousWorkMinutes`,
+`MinRestMinutes` và `MaxRestMinutes`. Số phút phải từ 1 đến 1440, max không nhỏ
+hơn min. Đặt `WORK_REST_ENABLED=false` để tắt chu kỳ này.
+
+Lịch đã xác nhận được lưu trong SQLite, không bị đổi khi client/worker restart
+hay retry finish. Một lượt nhận mới bắt đầu một chu kỳ chạy mới. Dừng thủ công
+được ưu tiên và không tự bật lại account; Dừng rồi Run cho phép bỏ qua lịch nghỉ.
+Nếu đã đủ KPI trước hạn, vẫn dùng lịch hoãn KPI 00:00–08:00 ngày hôm sau.
+Nghỉ theo chu kỳ ghi log `info`, không phát cảnh báo lỗi Discord.
+
+**Triển khai cả Client API và Worker mới cùng nhau**: API thêm outcome `resting`
+và schema 10 để lưu thời gian nghỉ; worker cũ vẫn dùng các outcome cũ.
+
+Kiểm thử đầy đủ với Client/SQLite và LMS giả lập cục bộ:
+`npm run test:worker-v2-rest` trong thư mục `client` sau khi build worker.
+Test dùng chu kỳ làm việc 1 phút và đẩy đồng hồ backend qua quãng nghỉ; không
+dùng tài khoản LMS thật.
+
+## Thông báo lỗi qua Discord
+
+Worker gửi trực tiếp tới nhiều Discord webhook, độc lập với Client API và proxy
+LMS. Trong `.env` của Docker Compose:
+
+```dotenv
+DISCORD_ENABLED=true
+DISCORD_WEBHOOK_URLS='https://discord.com/api/webhooks/ID1/TOKEN1;https://discord.com/api/webhooks/ID2/TOKEN2'
+DISCORD_EVENTS=worker_failed,lane_failed
+```
+
+Mỗi sự cố được gửi tới tất cả URL trong danh sách, phân cách bằng `;`. Chỉ nhận
+URL webhook HTTPS của Discord; URL trùng được gộp. Với kênh forum/thread, giữ
+`thread_id` trong URL webhook. Không commit URL thật vì URL chứa token.
+
+| Sự kiện | Khi nào gửi |
+| --- | --- |
+| `worker_failed` | Cấu hình/khởi động/đăng ký lỗi, coordinator lỗi, hoặc toàn bộ lane đã dừng |
+| `lane_failed` | Không tiếp nhận account an toàn, không xác nhận finish, xác minh IP proxy lỗi, hoặc lane thoát ngoài dự kiến |
+| `account_failed` | Account kết thúc `failed` nhưng lane tiếp tục chạy; cần bật thêm trong `DISCORD_EVENTS` |
+
+Để nhận cả lỗi HTTP LMS như `practice/api/save-take`, dùng:
+
+```dotenv
+DISCORD_EVENTS=worker_failed,lane_failed,account_failed
+```
+
+Thông báo có tên server, worker/lane, accountId, runId, giờ Việt Nam và lý do.
+File JSON đính kèm chứa mã sự kiện và chi tiết HTTP/exception đã được che dữ
+liệu nhạy cảm khi có. Không ping role/user hay `@everyone`. Khi tất cả lane lỗi,
+worker gửi thêm một thông báo tổng kết riêng. Hoàn thành chương trình, đủ KPI
+và dừng bình thường không tạo cảnh báo lỗi.
+
+Cấu hình .NET tương ứng nằm trong section `Discord` (`Discord__Enabled`,
+`Discord__WebhookUrls`, `Discord__Events` khi dùng biến môi trường). Mặc định
+tắt. `RequestTimeoutSeconds=5`, `DeliveryTimeoutSeconds=15`, `MaxRetries=2`
+(tối đa ba lần gửi). Một webhook lỗi không ngăn gửi tới các webhook khác.
+Gặp 429, worker chờ `Retry-After`/`retry_after`; gặp 401/403/404 sẽ ngừng dùng
+webhook đó đến lần restart. Cấu hình Discord sai được báo theo tên trường/vị
+trí URL, vô hiệu hóa mục không hợp lệ và không làm dừng worker.
+
+Worker chống phát trùng cùng loại/mã sự cố/lane/account/run trong 10 phút của
+cùng tiến trình. Retry sau mất phản hồi vẫn có thể tạo tin nhắn trùng ở Discord.
+Thông báo có giới hạn thời gian, không có hàng đợi lưu bền; OOM/SIGKILL hoặc mất
+mạng có thể khiến không gửi được. Dùng giám sát bên ngoài nếu cần bao phủ các
+trường hợp tiến trình bị kết thúc đột ngột.
+
+Kiểm thử HTTP thật với stand-in cục bộ (Postman CLI từ 1.70):
+
+```bash
+postman simulation run postman/simulations/discord-notifications/discord-notifications.sim.yaml --port 14650 --output ndjson --no-history
+```
+
+Ở terminal khác, sau khi build project tests:
+
+```bash
+DISCORD_SIMULATION_BASE_URL=http://127.0.0.1:14650 dotnet LotusLMS.Worker.V2.Tests/bin/Debug/net10.0/LotusLMS.Worker.V2.Tests.dll
+```
+
+Chỉ mã kiểm thử đổi địa chỉ Discord sang localhost; production vẫn kiểm tra
+URL Discord HTTPS và kết nối trực tiếp. Simulation chạy thật coordinator/lane,
+giả lập lỗi polling và HTTP 502/429/404 của Discord; không dùng account LMS hoặc
+webhook thật. Dừng simulation bằng Ctrl+C sau kiểm thử.
+
+Tham khảo contract [Discord Execute Webhook](https://docs.discord.com/developers/resources/webhook#execute-webhook)
+và [Discord Rate Limits](https://docs.discord.com/developers/topics/rate-limits).
+
 ## Vận hành và tra log
 
 1. Chạy Client và Worker V2 từ thư mục gốc bằng `docker compose up -d` (hoặc
@@ -130,6 +234,22 @@ Log lỗi LMS ghi mã HTTP khi có phản hồi và phân biệt lỗi đọc JS
 DNS/socket và TLS. Thiếu mã HTTP không tự được xem là lỗi mạng. Đường dẫn API
 trong log không chứa query; không ghi nguyên văn exception có thể chứa dữ liệu phiên.
 Lỗi đọc kiểu JSON vẫn giữ mã HTTP thực tế (ví dụ HTTP 200).
+
+Khi một HTTP request LMS thất bại, mở **Xem dữ liệu sự kiện → failure** trong
+log lỗi của account. `failure.http` có loại lỗi (`application_rejected`,
+`http_status`, `invalid_json`, `response_schema`, `timeout`, `network` hoặc
+`response_read`), exception/message, thông báo LMS, thời gian request, method,
+URL không có query, content type và các trường nghiệp vụ của request. Phản hồi
+gồm HTTP status, request/correlation ID nếu có và bản xem trước body; `causes`
+giữ loại exception bên trong, thông báo và đường dẫn/vị trí JSON khi có lỗi đọc
+dữ liệu. `failure.stackTrace` chỉ vị trí phát sinh exception trong worker/API.
+Terminal ghi cùng dữ liệu với nhãn `HTTP_REQUEST_FAILED` và scope lane/account/run.
+
+Thông tin này được ghi khi lỗi xảy ra, không cần bật `LogApiResponses`.
+Body/chuỗi dài được rút gọn; body JSON hỏng được bỏ và giữ vị trí lỗi parser.
+Thông tin xác thực, token, cookie, phiên, thiết bị
+và nội dung đáp án được che hoặc bỏ khỏi chẩn đoán. Không ghi toàn bộ request
+form/header. Log cũ chỉ có mô tả chung không thể khôi phục lại body đã bị bỏ.
 
 Log terminal trong mỗi lượt có tiền tố
 `[lane=<tên lane> account=<accountId> run=<runId> plan=<enrolmentPlanIid>]`

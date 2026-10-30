@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS worker_runs (
     last_heartbeat_at TEXT NOT NULL,
     lease_expires_at TEXT NOT NULL,
     finished_at TEXT,
+    finish_details_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(finish_details_json) AND json_type(finish_details_json) = 'object'),
     UNIQUE(worker_name,instance_id,request_id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_worker_runs_active_account ON worker_runs(account_id)

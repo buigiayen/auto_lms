@@ -16,7 +16,11 @@ internal static class LmsFailureDiagnostics
         var status = error.StatusCode is { } code ? $"HTTP {(int)code}" : "HTTP chưa xác định";
         var cause = error.InnerException;
         string reason;
-        if (cause is JsonException json)
+        if (error.HttpDiagnostics?["failureKind"]?.GetValue<string>() is "application_rejected")
+            reason = "LMS từ chối yêu cầu ở mức ứng dụng";
+        else if (error.HttpDiagnostics?["failureKind"]?.GetValue<string>() is "invalid_json")
+            reason = "phản hồi rỗng hoặc không phải JSON object hợp lệ";
+        else if (cause is JsonException json)
             reason = $"dữ liệu JSON không khớp kiểu phản hồi; dòng {json.LineNumber}, vị trí {json.BytePositionInLine}";
         else if (cause is OperationCanceledException)
             reason = "hết thời gian chờ LMS";
@@ -32,6 +36,19 @@ internal static class LmsFailureDiagnostics
         else
             reason = error.StatusCode is null ? "chưa xác định loại lỗi" : "phản hồi LMS không hợp lệ hoặc bị từ chối";
 
-        return $"Lỗi LMS tại {endpoint} ({status}; {reason}).";
+        var summary = $"Lỗi LMS tại {endpoint} ({status}; {reason}).";
+        // Only messages sanitized by the HTTP transport are suitable for shared worker logs.
+        if (error.HttpDiagnostics?["message"]?.GetValue<string>() is { Length: > 0 } message)
+            summary += $" {nameof(LotusLmsApiException)}: {message}";
+        if (error.HttpDiagnostics?["serverMessage"]?.GetValue<string>() is { Length: > 0 } serverMessage)
+            summary += $" LMS: {serverMessage}";
+        return summary;
     }
+
+    public static Dictionary<string, object?> Context(LotusLmsApiException error) => new()
+    {
+        ["exceptionType"] = error.GetType().Name,
+        ["stackTrace"] = error.StackTrace is { } trace ? trace[..Math.Min(trace.Length, 2048)] : null,
+        ["http"] = error.HttpDiagnostics?.DeepClone()
+    };
 }

@@ -2,10 +2,15 @@ using LotusLMS.Api;
 using LotusLMS.Client;
 using LotusLMS.Http;
 using LotusLMS.Worker.V2;
+using LotusLMS.Worker.V2.Notifications;
 using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
 
 var builder = Host.CreateApplicationBuilder(args);
+// Keep the sender independent of validated Worker/Client options and host disposal,
+// so startup configuration failures can still be reported.
+using var notifier = DiscordWorkerNotifier.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton<IWorkerNotifier>(notifier);
 
 builder.Logging.AddConsoleFormatter<GreenConsoleFormatter, ConsoleFormatterOptions>();
 builder.Logging.AddConsole(options => options.FormatterName = GreenConsoleFormatter.FormatterName);
@@ -36,11 +41,25 @@ try
 catch (OptionsValidationException error)
 {
     ReportConfigurationErrors([error]);
+    await NotifyConfigurationErrorsAsync([error]);
 }
 catch (AggregateException error) when (error.Flatten().InnerExceptions.All(exception => exception is OptionsValidationException))
 {
     ReportConfigurationErrors(error.Flatten().InnerExceptions.Cast<OptionsValidationException>());
+    await NotifyConfigurationErrorsAsync(error.Flatten().InnerExceptions.Cast<OptionsValidationException>());
 }
+catch (Exception error)
+{
+    Console.Error.WriteLine($"Worker không khởi động/chạy được ({error.GetType().Name}).");
+    Environment.ExitCode = 1;
+    await notifier.NotifyAsync(WorkerFailure.FromException("worker_failed", "HOST_FAILED",
+        "Worker không khởi động/chạy được do lỗi host.", error));
+}
+
+Task NotifyConfigurationErrorsAsync(IEnumerable<OptionsValidationException> errors) =>
+    notifier.NotifyAsync(new WorkerFailure("worker_failed", "CONFIGURATION_INVALID",
+        "Cấu hình Worker/Client/LMS không hợp lệ; worker không khởi động.",
+        Details: new Dictionary<string, object?> { ["validationErrors"] = errors.SelectMany(error => error.Failures).Distinct().ToArray() }));
 
 static void ReportConfigurationErrors(IEnumerable<OptionsValidationException> errors)
 {

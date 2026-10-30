@@ -145,7 +145,7 @@ gia hạn, nhận quyền sở hữu qua header X-Worker-Run-Id, X-Worker-Instan
 X-Worker-Lease-Token.
 
 `POST /api/worker/accounts/:accountId/finish` nhận cùng ba trường sở hữu và
-`outcome: "completed" | "failed" | "stopped" | "deferred"`. Backend nhả khóa,
+`outcome: "completed" | "failed" | "stopped" | "deferred" | "resting"`. Backend nhả khóa,
 ghi log và với completed/failed/stopped thường chuyển account sang Dừng treo.
 `deferred` giữ account ở trạng thái Treo và chọn ngẫu nhiên một thời điểm trong
 khung **00:00:00–08:00:00 ngày hôm sau theo giờ Việt Nam**, chính xác đến giây.
@@ -156,6 +156,34 @@ khi khởi động lại hoặc gửi lại finish; lần đạt KPI ngày tiế
 Nhấn Dừng treo rồi Treo lại sẽ xóa thời gian hoãn. Gửi lại cùng kết quả là idempotent.
 Nhấn Dừng rồi Run lại khi Worker đang dừng vẫn giữ khóa cũ; finish mới nhả khóa
 và giữ account trong hàng chờ cho lượt kế tiếp.
+
+`resting` dùng riêng cho chu kỳ chạy/nghỉ, yêu cầu thêm `restSeconds` nguyên từ
+60 đến 86400. Ví dụ payload (kèm quyền sở hữu hiện tại):
+
+```json
+{
+  "runId": "<run UUID>",
+  "instanceId": "<instance UUID>",
+  "leaseToken": "<current ownership token>",
+  "outcome": "resting",
+  "restSeconds": 900
+}
+```
+
+Backend lưu trạng thái lượt `deferred` và đặt `available_after` bằng thời điểm
+finish cộng thời gian nghỉ. Response `data` có `runId`, `state="deferred"` và
+`availableAfter`. `execution.deferReason` là `scheduled_break` cho kiểu nghỉ này,
+`daily_kpi` cho lịch KPI. Trường `restSeconds` không được gửi với outcome khác.
+Thiếu/sai duration trả 400; sai quyền sở hữu trả 403; retry khác outcome hoặc
+duration trả 409 `RUN_OUTCOME_CONFLICT`. Retry đúng giữ nguyên cả thời điểm nghỉ
+và log, không ghi lại lịch. Metadata của run được lưu trong
+`worker_runs.finish_details_json` để giữ tính ổn định qua restart.
+
+Nếu đã nhận lệnh Dừng hoặc Dừng rồi Run, finish không đặt lịch nghỉ và không
+thay đổi ý định của người dùng; `availableAfter` trong receipt có thể null.
+Đến hạn, account vào hàng chờ, vẫn cần một worker/lane đang chạy để nhận lại.
+Worker V2 mặc định làm việc 180 phút từ lúc nhận, nghỉ ngẫu nhiên 900–1800 giây;
+đổi các giới hạn qua cấu hình Worker/Docker Compose.
 
 Không heartbeat đủ 30 giây: lượt được đánh dấu lost khi API tiếp theo kiểm tra,
 account vẫn Treo được nhận lại. Token cũ không thể heartbeat hoặc finish lượt

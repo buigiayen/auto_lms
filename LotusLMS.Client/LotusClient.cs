@@ -59,7 +59,9 @@ public sealed class LotusClient : ILotusClient, IDisposable
         DataAsync<ClientRunControl>(HttpMethod.Get, AccountPath(accountId, "control"), null, cancellationToken, ownership);
     public Task<ClientFinishResult> FinishAsync(string accountId, ClientFinishRequest request, CancellationToken cancellationToken = default)
     {
-        if (request.Outcome is not ("completed" or "failed" or "stopped" or "deferred")) throw new ArgumentException("Invalid worker outcome.", nameof(request));
+        if (request.Outcome is not ("completed" or "failed" or "stopped" or "deferred" or "resting")) throw new ArgumentException("Invalid worker outcome.", nameof(request));
+        if (request.Outcome == "resting" ? request.RestSeconds is null or < 60 or > 86400 : request.RestSeconds is not null)
+            throw new ArgumentException("RestSeconds is required from 60 to 86400 only for a resting outcome.", nameof(request));
         return DataAsync<ClientFinishResult>(HttpMethod.Post, AccountPath(accountId, "finish"), request, cancellationToken);
     }
     public Task<ClientLogReceipt> SendLogAsync(ClientWorkerLog log, CancellationToken cancellationToken = default) =>

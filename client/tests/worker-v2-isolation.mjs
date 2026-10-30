@@ -128,6 +128,7 @@ try {
   child = spawn('dotnet', [join(workerDirectory, 'bin/Debug/net10.0/LotusLMS.Worker.V2.dll')], {
     cwd: workerDirectory,
     env: { ...process.env, DOTNET_ENVIRONMENT: 'Production', DOTNET_CLI_HOME: join(directory, 'dotnet-home'),
+      Discord__Enabled: 'false',
       Client__BaseUrl: `http://127.0.0.1:${app.server.address().port}`, Worker__WorkerName: 'isolation',
       Worker__RegistrationApiKey: bootstrap, Worker__MaxConcurrentAccounts: '2', Worker__PollIntervalSeconds: '1',
       Worker__HeartbeatIntervalSeconds: '1', Worker__SaveItemSeconds: '1', Worker__StopOnDailyKpi: 'false',

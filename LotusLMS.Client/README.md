@@ -70,8 +70,15 @@ với dịch vụ khác vì SDK cấu hình BaseAddress và Timeout của nó.
 | `HeartbeatAsync(accountId, ownership, ct)` | Gia hạn quyền sở hữu và đọc điều khiển |
 | `GetControlAsync(accountId, ownership, ct)` | Chỉ đọc điều khiển bằng header, không gia hạn |
 | `SendLogAsync(log, ct)` | Gửi log kèm runId và eventId; trả thông tin chống trùng |
-| `FinishAsync(accountId, request, ct)` | Xác nhận completed / failed / stopped / deferred |
+| `FinishAsync(accountId, request, ct)` | Xác nhận completed / failed / stopped / deferred / resting |
 | `RegisterWorkerAsync(workerName, ct)` | Dùng bearer key bootstrap để đăng ký/tải lại API key ổn định cho Worker |
+
+`Outcome="resting"` yêu cầu `RestSeconds` là số nguyên 60–86400 (từ 1 phút đến
+24 giờ). Chỉ outcome này được gửi `RestSeconds`. Backend trả `State="deferred"`
+và `AvailableAfter`, giữ account Treo và nhả lane. Retry cùng run/outcome/duration
+trả lại đúng lịch cũ; khác outcome/duration trả 409. Dừng/Run thủ công đang xử
+lý được ưu tiên, khi đó `AvailableAfter` có thể null. `ClientExecution` có thêm
+`AvailableAfter` và `DeferReason` (`scheduled_break` hoặc `daily_kpi`).
 
 `ClientAccount` có `ManagingTeacher`, `Execution`, proxy tóm tắt và chương trình
 đã chọn: `EnrolmentPlanIid` (int?), `EnrolmentPlanName`. Hai trường này cũng có trên

@@ -60,6 +60,7 @@ function start(name, key, laneCount = 1) {
   const laneNames = Array.from({ length: laneCount }, (_, index) => `${workerName}-${String(index + 1).padStart(2, '0')}`);
   const child = spawn('dotnet', [binary], { cwd: workerDirectory, env: { ...process.env,
     DOTNET_ENVIRONMENT: 'Production', DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_CLI_HOME: join(directory, 'dotnet-home'),
+    Discord__Enabled: 'false',
     Client__BaseUrl: `http://127.0.0.1:${app.server.address().port}`,
     Client__RequestTimeoutSeconds: laneCount > 1 ? '10' : '2', Worker__WorkerName: workerName,
     Worker__ServerName: serverName,

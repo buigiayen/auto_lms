@@ -2,6 +2,7 @@ using LotusLMS.Api;
 using LotusLMS.Client;
 using LotusLMS.Worker.V2.Accounts;
 using LotusLMS.Worker.V2.LotusRunner.CheckingTime;
+using LotusLMS.Worker.V2.Notifications;
 using Microsoft.Extensions.Options;
 
 namespace LotusLMS.Worker.V2;
@@ -12,11 +13,26 @@ internal sealed class Worker(
     IOptions<LotusLmsOptions> lmsDefaults,
     TimeProvider clock,
     ILoggerFactory loggerFactory,
-    IHostApplicationLifetime applicationLifetime) : BackgroundService
+    IHostApplicationLifetime applicationLifetime,
+    IWorkerNotifier notifier) : BackgroundService
 {
     private readonly ILogger<Worker> _logger = loggerFactory.CreateLogger<Worker>();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        try { await RunCoordinatorAsync(stoppingToken); }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        catch (Exception error)
+        {
+            _logger.LogCritical("Worker coordinator stopped unexpectedly with {ErrorType}.", error.GetType().Name);
+            await notifier.NotifyAsync(WorkerFailure.FromException("worker_failed", "COORDINATOR_FAILED",
+                "Worker dừng do lỗi ngoài quy trình xử lý lane.", error));
+            Environment.ExitCode = 1;
+            applicationLifetime.StopApplication();
+        }
+    }
+
+    private async Task RunCoordinatorAsync(CancellationToken stoppingToken)
     {
         var settings = options.Value;
         var processingFactory = new AccountProcessingFactory(lmsDefaults, options, clock, loggerFactory);
@@ -38,7 +54,8 @@ internal sealed class Worker(
                     options,
                     clock,
                     processingFactory,
-                    loggerFactory));
+                    loggerFactory,
+                    notifier));
                 _logger.LogInformation("Lane {WorkerName} registered with Client API.", laneName);
             }
         }
@@ -49,6 +66,8 @@ internal sealed class Worker(
         catch (Exception error)
         {
             _logger.LogCritical(error, "Worker lane registration failed; no lane will claim accounts.");
+            await notifier.NotifyAsync(WorkerFailure.FromException("worker_failed", "REGISTRATION_FAILED",
+                "Không đăng ký được các lane với Client API; worker dừng và không nhận account.", error));
             Environment.ExitCode = 1;
             applicationLifetime.StopApplication();
             return;
@@ -68,6 +87,9 @@ internal sealed class Worker(
         if (!stoppingToken.IsCancellationRequested)
         {
             _logger.LogCritical("All worker lanes have exited; stopping the host.");
+            await notifier.NotifyAsync(new WorkerFailure("worker_failed", "ALL_LANES_STOPPED",
+                $"Toàn bộ {lanes.Count} lane đã dừng do lỗi; worker sẽ thoát.",
+                Details: new Dictionary<string, object?> { ["laneCount"] = lanes.Count }));
             Environment.ExitCode = 1;
             applicationLifetime.StopApplication();
         }
@@ -100,12 +122,25 @@ internal sealed class WorkerLane(
     IOptions<WorkerOptions> workerOptions,
     TimeProvider clock,
     AccountProcessingFactory processingFactory,
-    ILoggerFactory loggerFactory)
+    ILoggerFactory loggerFactory,
+    IWorkerNotifier notifier)
 {
     private readonly ILogger _logger = loggerFactory.CreateLogger("WorkerLane." + workerName);
     private readonly AccountWebProxyProvider _proxyProvider = new();
 
     public async Task RunAsync(CancellationToken stoppingToken)
+    {
+        try { await RunLaneAsync(stoppingToken); }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        catch (Exception error)
+        {
+            _logger.LogError("Lane {WorkerName} stopped unexpectedly with {ErrorType}.", workerName, error.GetType().Name);
+            await notifier.NotifyAsync(WorkerFailure.FromException("lane_failed", "LANE_UNEXPECTED_FAILURE",
+                "Lane dừng do lỗi ngoài quy trình xử lý account.", error, workerName));
+        }
+    }
+
+    private async Task RunLaneAsync(CancellationToken stoppingToken)
     {
         using var backendHttp = new HttpClient(new SocketsHttpHandler
         {
@@ -146,6 +181,8 @@ internal sealed class WorkerLane(
             catch (Exception error)
             {
                 _logger.LogError(error, "Lane {WorkerName} stopped because it cannot safely receive accounts.", workerName);
+                await notifier.NotifyAsync(WorkerFailure.FromException("lane_failed", "RECEIVE_FAILED",
+                    "Lane không thể tiếp nhận account an toàn và đã dừng.", error, workerName));
                 return;
             }
 
@@ -178,10 +215,14 @@ internal sealed class WorkerLane(
         {
             using var accountScope = _logger.BeginScope(new AccountLogScope(
                 workerName, context.AccountId, context.Ownership.RunId, context.EnrolmentPlanIid));
+            var settings = workerOptions.Value;
+            if (settings.WorkRestEnabled)
+                context.ScheduleRest(TimeSpan.FromMinutes(settings.ContinuousWorkMinutes), settings.PickRestSeconds());
             var leaseTask = lease.RunAsync(context, stoppingToken);
             var outcome = "stopped";
             var reason = context.ValidateConfiguration();
             var stopLane = false;
+            LotusLmsApiException? lmsFailure = null;
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(
                 stoppingToken,
                 context.StoppingToken);
@@ -231,34 +272,32 @@ internal sealed class WorkerLane(
                     }
                     catch (OperationCanceledException) when (linked.IsCancellationRequested)
                     {
-                        reason = context.StopReason;
-                        outcome = "stopped";
+                        (outcome, reason) = CancellationResult(context, stoppingToken);
                     }
                     catch (Exception error)
                     {
                         outcome = "failed";
+                        lmsFailure = error as LotusLmsApiException;
                         reason = GetSafeFailureReason(error);
                         LogAccountFailure(error, context.AccountId);
                     }
 
                     context.Stop(reason);
-                    await TrySendFinalLogAsync(context, logs, outcome, reason, stoppingToken);
+                    await TrySendFinalLogAsync(context, logs, outcome, reason, stoppingToken, lmsFailure);
                 }
             }
             catch (OperationCanceledException) when (linked.IsCancellationRequested)
             {
-                outcome = "stopped";
-                reason = context.StoppingToken.IsCancellationRequested
-                    ? context.StopReason
-                    : "Worker đang shutdown.";
+                (outcome, reason) = CancellationResult(context, stoppingToken);
                 await TrySendFinalLogAsync(context, logs, outcome, reason, stoppingToken);
             }
             catch (Exception error)
             {
                 outcome = "failed";
+                lmsFailure = error as LotusLmsApiException;
                 reason = GetSafeFailureReason(error);
                 LogAccountFailure(error, context.AccountId);
-                await TrySendFinalLogAsync(context, logs, outcome, reason, stoppingToken);
+                await TrySendFinalLogAsync(context, logs, outcome, reason, stoppingToken, lmsFailure);
             }
             finally
             {
@@ -279,12 +318,26 @@ internal sealed class WorkerLane(
                     "Lane {WorkerName} could not confirm finish for account {AccountId}; stopping to avoid taking another account.",
                     workerName,
                     context.AccountId);
+                if (!stoppingToken.IsCancellationRequested)
+                    await notifier.NotifyAsync(new WorkerFailure("lane_failed", "FINISH_UNCONFIRMED",
+                        "Không xác nhận được finish với Client API; lane dừng để tránh nhận account khác. " + reason,
+                        workerName, context.AccountId, context.Ownership.RunId,
+                        lmsFailure is null ? null : LmsFailureDiagnostics.Context(lmsFailure)));
                 return true;
             }
 
             receiver.Release();
             if (stopLane)
+            {
                 _logger.LogError("Lane {WorkerName} stopped after a proxy IP verification failure.", workerName);
+                if (!stoppingToken.IsCancellationRequested)
+                    await notifier.NotifyAsync(new WorkerFailure("lane_failed", "PROXY_IP_VERIFICATION_FAILED",
+                        reason ?? "Không xác minh được IP proxy.", workerName, context.AccountId, context.Ownership.RunId));
+            }
+            else if (outcome == "failed" && !stoppingToken.IsCancellationRequested)
+                await notifier.NotifyAsync(new WorkerFailure("account_failed", "ACCOUNT_FAILED",
+                    reason ?? "Account kết thúc do lỗi.", workerName, context.AccountId, context.Ownership.RunId,
+                    lmsFailure is null ? null : LmsFailureDiagnostics.Context(lmsFailure)));
             return stopLane;
         }
     }
@@ -331,7 +384,8 @@ internal sealed class WorkerLane(
             RunId = context.Ownership.RunId,
             InstanceId = context.Ownership.InstanceId,
             LeaseToken = context.Ownership.LeaseToken,
-            Outcome = outcome
+            Outcome = outcome,
+            RestSeconds = outcome == "resting" ? context.ScheduledRestSeconds : null
         };
         while (!timeout.IsCancellationRequested)
         {
@@ -361,13 +415,15 @@ internal sealed class WorkerLane(
         AccountLog logs,
         string outcome,
         string reason,
-        CancellationToken stoppingToken)
+        CancellationToken stoppingToken,
+        LotusLmsApiException? lmsFailure = null)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(5));
         try
         {
-            await logs.SendAsync(context, outcome == "failed" ? "error" : "info", reason, timeout.Token);
+            await logs.SendAsync(context, outcome == "failed" ? "error" : "info", reason, timeout.Token,
+                lmsFailure is null ? null : LmsFailureDiagnostics.Context(lmsFailure));
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
@@ -386,15 +442,21 @@ internal sealed class WorkerLane(
         _ => $"Lỗi xử lý account ({error.GetType().Name})."
     };
 
+    private static (string Outcome, string Reason) CancellationResult(AccountRunContext context, CancellationToken stoppingToken) =>
+        stoppingToken.IsCancellationRequested ? ("stopped", "Worker đang shutdown.")
+            : context.ScheduledRestSeconds is not null && !context.LeaseLost
+                ? ("resting", context.StopReason) : ("stopped", context.StopReason);
+
     private void LogAccountFailure(Exception error, string accountId)
     {
         if (error is LotusLmsApiException lmsError)
         {
             _logger.LogError(
-                "Account {AccountId} failed in lane {WorkerName}: {Failure}",
+                "Account {AccountId} failed in lane {WorkerName}: {Failure} HTTP_REQUEST_FAILED {HttpDetails}",
                 accountId,
                 workerName,
-                LmsFailureDiagnostics.Describe(lmsError));
+                LmsFailureDiagnostics.Describe(lmsError),
+                System.Text.Json.JsonSerializer.Serialize(LmsFailureDiagnostics.Context(lmsError)));
             return;
         }
 

@@ -12,6 +12,12 @@ public sealed class WorkerOptions
     public int PollIntervalSeconds { get; init; }
     public int HeartbeatIntervalSeconds { get; init; }
     public int StatusIntervalSeconds { get; init; } = 60;
+    public bool WorkRestEnabled { get; init; } = true;
+    public int ContinuousWorkMinutes { get; init; } = 180;
+    public int MinRestMinutes { get; init; } = 15;
+    public int MaxRestMinutes { get; init; } = 30;
+
+    internal int PickRestSeconds() => Random.Shared.Next(MinRestMinutes * 60, MaxRestMinutes * 60 + 1);
 
     public int PlanPageSize { get; init; } = 12;
 
@@ -73,6 +79,15 @@ public sealed class WorkerOptions
             yield return "Worker:PollIntervalSeconds phải từ 1 đến 60 giây.";
         if (HeartbeatIntervalSeconds is < 1 or > 10)
             yield return "Worker:HeartbeatIntervalSeconds phải từ 1 đến 10 giây.";
+        if (WorkRestEnabled)
+        {
+            if (ContinuousWorkMinutes is < 1 or > 1440)
+                yield return "Worker:ContinuousWorkMinutes phải từ 1 đến 1440 phút.";
+            if (MinRestMinutes is < 1 or > 1440)
+                yield return "Worker:MinRestMinutes phải từ 1 đến 1440 phút.";
+            if (MaxRestMinutes < MinRestMinutes || MaxRestMinutes > 1440)
+                yield return "Worker:MaxRestMinutes phải lớn hơn hoặc bằng MinRestMinutes và không vượt quá 1440 phút.";
+        }
     }
 
     private string EffectiveServerName => string.IsNullOrWhiteSpace(ServerName)

@@ -1,0 +1,10 @@
+version: 1
+name: discord-notifications
+slug: discord-notifications
+protocol: http
+interceptRequests: true
+origin: discord.com
+scenarios:
+  - name: default
+    path: ./default.js
+    default: true

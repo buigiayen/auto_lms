@@ -74,6 +74,22 @@ Check(finished.State == "completed" && handler.Json?["outcome"]?.GetValue<string
 handler.Body = $$$"""{"data":{"runId":"{{{runId}}}","state":"deferred"}}""";
 finished = await client.FinishAsync(accountId, new ClientFinishRequest { RunId = runId, InstanceId = instanceId, LeaseToken = leaseToken, Outcome = "deferred" });
 Check(finished.State == "deferred" && handler.Json?["outcome"]?.GetValue<string>() == "deferred", "finish accepts daily-KPI deferral");
+handler.Body = $$$"""{"data":{"runId":"{{{runId}}}","state":"deferred","availableAfter":"2040-01-01T00:15:00Z"}}""";
+finished = await client.FinishAsync(accountId, new ClientFinishRequest
+    { RunId = runId, InstanceId = instanceId, LeaseToken = leaseToken, Outcome = "resting", RestSeconds = 900 });
+Check(finished.State == "deferred" && finished.AvailableAfter == DateTimeOffset.Parse("2040-01-01T00:15:00Z")
+    && handler.Json?["restSeconds"]?.GetValue<int>() == 900,
+    "scheduled-rest finish sends its stable break duration and reads the persisted resume time");
+foreach (var duration in new int?[] { null, 59, 86401 })
+{
+    try
+    {
+        await client.FinishAsync(accountId, new ClientFinishRequest
+            { RunId = runId, InstanceId = instanceId, LeaseToken = leaseToken, Outcome = "resting", RestSeconds = duration });
+        throw new Exception("FAIL: invalid scheduled-rest duration must be rejected");
+    }
+    catch (ArgumentException) { Check(true, "SDK rejects missing or out-of-range rest durations before making HTTP calls"); }
+}
 handler.Body = "{\"data\":{\"workerName\":\"new-worker\",\"apiKey\":\"new-key\"}}";
 var registration = await client.RegisterWorkerAsync("new-worker");
 Check(registration.ApiKey == "new-key" && handler.Uri!.AbsolutePath == "/root/api/workers", "worker registration is reusable outside the Worker app");

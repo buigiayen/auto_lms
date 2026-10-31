@@ -1,11 +1,11 @@
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
 import { timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Store } from './store.js';
 import { LmsService, testProxy } from './lms.js';
 import { AppError, pageParams, requireValue } from './errors.js';
 import { AdminAuth } from './auth.js';
+import { PublicAssets } from './public-assets.js';
 
 const staticFiles = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']], ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
@@ -50,6 +50,7 @@ export function createApp({
   if (workerRegistrationKey && workerRegistrationKey.length < 32)
     throw new Error('WORKER_REGISTRATION_KEY phải có ít nhất 32 ký tự.');
   const auth = adminAuth === null ? null : new AdminAuth({ ...adminAuth, clock: clock || Date.now });
+  const assets = new PublicAssets(staticFiles, new URL('../public/', import.meta.url), { cache: environment !== 'development' });
   const store = new Store(directory, { clock, environment }), lms = new LmsService(store, lmsOptions);
   const acceptedHosts = new Set(['localhost', '127.0.0.1', '[::1]', process.env.CLIENT_HOST,
     ...allowedHosts.map(host => host.trim()).filter(Boolean)]);
@@ -88,11 +89,14 @@ export function createApp({
         res.statusCode = 302;
         res.setHeader('Location', path === '/' ? '/login' : '/'); res.end(); return;
       }
-      if (method === 'GET' && staticFiles.has(path)) {
-        if (path === '/app.js') auth?.requireSession(req);
-        const [file, type] = staticFiles.get(path);
-        res.setHeader('Content-Type', type); res.end(readFileSync(new URL(`../public/${file}`, import.meta.url))); return;
+      const asset = method === 'GET' ? assets.get(path) : null;
+      if (asset) {
+        if (asset.canonical === '/app.js') auth?.requireSession(req);
+        res.setHeader('Content-Type', asset.type);
+        res.setHeader('X-Lotus-Assets-Version', asset.version);
+        res.end(asset.body); return;
       }
+      if (path.startsWith('/assets/')) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy phiên bản giao diện. Tải lại trang để cập nhật.');
       if (path === '/api/health' && method === 'GET') { send(200, { data: { status: 'ok', storage: 'sqlite' } }); return; }
       if (path === '/api/workers' && method === 'POST') {
         if (!workerRegistrationKey) throw new AppError(503, 'WORKER_REGISTRATION_DISABLED', 'Chưa cấu hình WORKER_REGISTRATION_KEY trên Client API.');

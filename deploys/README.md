@@ -176,6 +176,30 @@ Cũng có thể chọn `IMAGE_TAG=v1.2.3` khi Git tag đó đã được publish
 để đổi phiên bản image. Nếu bản mới đã nâng schema, việc quay lại bản cũ cần
 database tương thích hoặc bản sao lưu tương ứng.
 
+### Image mới nhưng giao diện chưa đổi
+
+Server tạo URL CSS/JS theo nội dung của toàn bộ giao diện, ví dụ
+`/assets/0123456789abcdef/app.js`. Cả file CSS, script trang đăng nhập và module
+import đều dùng cùng phiên bản. Khi HTML/CSS/JS thay đổi, URL tự đổi để tránh
+trình duyệt hoặc CDN dùng file cũ. Production giữ một bộ file nhất quán đến
+khi container được tạo lại; development đọc nội dung mới khi tải lại trang.
+Các đường dẫn cũ `/app.js`, `/styles.css`, ... tiếp tục hoạt động.
+
+Header `X-Lotus-Assets-Version` trên HTML và file tĩnh cho biết phiên bản đang
+được phục vụ. Có thể kiểm tra qua tên miền mà không đăng nhập:
+
+```bash
+curl -sD - -o /dev/null https://YOUR_DOMAIN/login
+```
+
+Nếu Docker đã dùng image mới nhưng trình duyệt chưa cập nhật, kiểm tra header
+`Cache-Control`, `Age` và `CF-Cache-Status` trên CSS/JS. Ứng dụng gửi
+`Cache-Control: no-store`; nếu tên miền trả `max-age` thì CDN/reverse proxy
+đang ghi đè chính sách này. Với Cloudflare, đặt **Browser Cache TTL → Respect
+Existing Headers** và kiểm tra Cache Rules không ép cache trang đăng nhập,
+HTML hoặc `/api/*`. Purge các URL file cũ nếu cần, sau đó tải lại trình duyệt.
+Purge Cloudflare không xóa các bản đã lưu trong cache trình duyệt.
+
 ```bash
 docker compose stop
 docker compose start

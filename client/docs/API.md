@@ -4,6 +4,10 @@
 
 - Backend local: `http://127.0.0.1:3100`, API bắt đầu bằng `/api`.
 - API client nhận/trả JSON UTF-8; các API LMS ở phần cuối dùng form riêng.
+- HTML và file giao diện trả `X-Lotus-Assets-Version`. CSS/JS được tham chiếu
+  qua `/assets/<version>/<file>`; `<version>` thay đổi khi nội dung giao diện
+  thay đổi, bao gồm cả module import. URL phiên bản cũ trả 404 để tránh trộn
+  file giữa các bản. Quyền đăng nhập của `app.js` áp dụng cho cả URL có phiên bản.
 - `accountId`, `eventId`, `sessionId`: UUID. Các mã `iid` LMS là số nguyên dương.
 - Thời gian request/response dùng UTC ISO 8601, ví dụ `2026-10-21T08:00:00.000Z`.
 - Giao diện và backend cùng origin. Mặc định server chỉ lắng nghe localhost.

@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using LotusLMS.Api;
+using LotusLMS.Client;
 using LotusLMS.Worker.V2;
 using LotusLMS.Worker.V2.LotusRunner.CheckingTime;
 using LotusLMS.Worker2;
@@ -16,7 +17,8 @@ public class PracticeServices(
      IReadOnlyCollection<CheckingTimeDTO.AutoStudy> AutoStudy,
      Func<Task<StudyPlan>> Callback,
      Func<string, CancellationToken, Task> sendClientLog,
-     CancellationToken cancellationToken)
+     CancellationToken cancellationToken,
+     Action<ClientCurrentLesson?>? reportCurrentLesson = null)
     {
         var pendingPractices = AutoStudy
             .Where(p => p.typeAutoStudy == CheckingTimeDTO.TypeAutoStudy.PracticeOnly)
@@ -25,8 +27,10 @@ public class PracticeServices(
 
         while (pendingPractices.Count > 0)
         {
+            await sendClientLog($"==> Bắt đầu bài học. {pendingPractices[0].name}", cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             var item = pendingPractices[0];
+            using var activity = new CurrentStudyActivity(item, ClientRunSections.Review, reportCurrentLesson);
             var key = (item.iidRoot, item.iid);
             var attempt = attempts.GetValueOrDefault(key) + 1;
             attempts[key] = attempt;
@@ -41,6 +45,7 @@ public class PracticeServices(
             var timeStart = timeProvider.GetUtcNow().ToUnixTimeSeconds();
             var getPracticeDetail = await client.GetPracticeDetailAsync(lotusLmsSession, item.iid, item.iidRoot!.Value, cancellationToken);
             var sco = getPracticeDetail?.Result?._expand?.ExamSco;
+
             if (sco is null)
             {
                 throw new InvalidDataException("Practice detail has no expanded exam_sco.");
@@ -92,6 +97,7 @@ public class PracticeServices(
 
             // Refresh the pending practice list instead of recursively starting
             // another RunAsync call while this invocation is still active.
+            reportCurrentLesson?.Invoke(null);
             var refreshedPlan = await Callback();
             if (refreshedPlan.CompletionResult != AccountStudyResult.Pending)
             {

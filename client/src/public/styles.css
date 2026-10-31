@@ -69,6 +69,12 @@
 .station-sleeping .station-status{color:#827293}
 .station-sleeping .station-status i{background:#aa9abc}
 .mascot-target{position:relative;margin:5px -5px 0}
+.mascot-speech{position:relative;margin:16px 6px 4px;padding:11px 13px;border:1px solid #b9cda5;border-radius:13px 13px 13px 4px;background:#f0f6e7;color:#385338;box-shadow:0 3px 0 #dce5d43d;overflow-wrap:anywhere}
+.mascot-speech::after{content:"";position:absolute;bottom:-7px;left:calc(50% - 6px);width:12px;height:12px;border-right:1px solid #b9cda5;border-bottom:1px solid #b9cda5;background:#f0f6e7;transform:rotate(45deg)}
+.mascot-speech-intro{display:block;margin-bottom:4px;color:#627653;font-size:10px}
+.mascot-speech p{position:relative;margin:0;font-size:11px;line-height:1.65}
+.mascot-speech strong{font-weight:600;color:#31533a}
+.mascot-speech-plus{color:#71885f}
 .mascot-button{display:block;position:relative;width:100%;border:0;background:transparent;padding:0;border-radius:12px;color:#34563f}
 .mascot-button:hover{background:#e9efdd40}
 .mascot-button:focus-visible{outline-offset:0}
@@ -170,6 +176,11 @@
 .station-sleeping .worker-nameplate{background:#f0edf4;border-color:#e2dcea;color:#7b6a8c}
 .station-sleeping .worker-nameplate:hover{background:#e8e0f0;border-color:#b7a6c7}
 .station-activity{margin:10px 2px 0;max-width:100%;height:17px;font-size:9px;color:#7a8773;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.station-current-lesson{margin-top:10px;padding:10px 11px;border:1px solid #dce5d3;border-radius:7px;background:#f6f9f0;color:#385338;text-align:left;overflow-wrap:anywhere}
+.current-lesson-section{display:block;margin-bottom:8px;font-size:9px;font-weight:600;color:#62715c;letter-spacing:.3px}
+.station-current-lesson>div{display:grid;grid-template-columns:42px minmax(0,1fr);gap:6px;margin-top:5px;font-size:10px;line-height:1.5}
+.station-current-lesson>div>span{color:#7a8773}
+.station-current-lesson strong{font-weight:500}
 .station-create{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;align-self:stretch;min-height:342px;padding:25px 15px;border:1px dashed #b7c8a6;border-radius:15px;background:#f6f9f0a6;color:#607b4f;transition:background .2s,border-color .2s}
 .station-create:hover{background:#edf3e0;border-color:#71965a}
 .create-mascot{display:grid;place-items:center;width:73px;height:73px;margin-bottom:8px;border:1px dashed #adc198;border-radius:26px 26px 22px 22px;background:#eef4e3;transform:rotate(-7deg)}

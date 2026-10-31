@@ -34,6 +34,23 @@ Mở `http://127.0.0.1:3100`. `npm run dev` dùng chế độ watch; `npm test` 
 thử offline, `npm run check` kiểm tra cú pháp. Dữ liệu được tạo tự động ở
 `client/data`; không có tài khoản hoặc mật khẩu mẫu được thêm vào database.
 
+### Căn cước và username khi phát triển
+
+`npm run dev` mặc định đặt `NODE_ENV=development` nếu môi trường chưa khai báo.
+Khi đó ô **Căn cước / Tên đăng nhập** cho phép username như `hv02`, dài 1–100 ký
+tự và không có khoảng trắng/ký tự điều khiển. Giá trị được giữ nguyên để đăng
+nhập LMS và gửi tới worker.
+
+Chỉ `NODE_ENV=development` bật quy tắc này. `NODE_ENV=production`, môi trường
+không khai báo khi chạy `npm start` và các giá trị khác vẫn yêu cầu đúng 12 chữ
+số. Giá trị `NODE_ENV` đã đặt trước luôn được ưu tiên, kể cả với `npm run dev`.
+Giao diện đọc `GET /api/config` sau khi đăng nhập để lấy cùng quy tắc với server.
+
+Với Docker Compose ở thư mục gốc, đặt `NODE_ENV=development` trong `.env` rồi tạo
+lại client để thử username chữ. Compose triển khai trong `deploys` luôn đặt
+`NODE_ENV=production`. Database cũ tự nâng schema 11, có bản sao lưu
+`client.before-account-usernames.sqlite` trước khi đổi ràng buộc lưu trữ.
+
 Cấu hình tùy chọn qua biến môi trường: `PORT` (3100), `CLIENT_HOST`
 (`127.0.0.1`), `CLIENT_DATA_DIR` (đường dẫn thư mục dữ liệu),
 `LMS_YENTHUY_API_URL`, `LMS_TRUONGSON_API_URL`. Hai URL LMS mặc định theo cấu hình

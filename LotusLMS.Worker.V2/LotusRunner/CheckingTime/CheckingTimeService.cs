@@ -17,8 +17,10 @@ internal sealed class CheckingTimeService(ILotusLmsApiClient client,
         bool hasProxy,
         Func<string, CancellationToken, Task> sendClientLog,
         CancellationToken token,
-        IReadOnlyCollection<string>? runSections = null)
+        IReadOnlyCollection<string>? runSections = null,
+        Action<ClientCurrentLesson?>? reportCurrentLesson = null)
     {
+        reportCurrentLesson?.Invoke(null);
         var sections = runSections ?? ClientRunSections.All;
         if (!ClientRunSections.IsValid(sections))
             throw new InvalidDataException("Chọn ít nhất một phần cần chạy hợp lệ.");
@@ -52,7 +54,8 @@ internal sealed class CheckingTimeService(ILotusLmsApiClient client,
                 studyPlan.Items,
                 RefreshStudyPlan,
                 sendClientLog,
-                token);
+                token,
+                reportCurrentLesson);
             if (practiceResult != AccountStudyResult.Pending)
             {
                 return practiceResult;
@@ -79,7 +82,8 @@ internal sealed class CheckingTimeService(ILotusLmsApiClient client,
                 refreshedPlan.Items,
                 RefreshStudyPlan,
                 sendClientLog,
-                token)
+                token,
+                reportCurrentLesson)
             : AccountStudyResult.Pending;
     }
 

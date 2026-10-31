@@ -10,6 +10,7 @@ public class CheckingTimeDTO
         public int? iidRoot {get;set;}
         public int iid { get; set; }
         public string name { get; set; }
+        public string? courseName { get; set; }
         public string ntype { get; set; } = "video";
         public TypeAutoStudy typeAutoStudy {get;set;}
     }

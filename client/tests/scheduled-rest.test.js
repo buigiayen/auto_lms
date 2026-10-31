@@ -104,7 +104,7 @@ test('rest metadata migration backs up and preserves version-9 runs, credentials
     db.close();
     store = new Store(directory);
     assert.ok(existsSync(join(directory, 'client.before-scheduled-rest.sqlite')));
-    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 10);
+    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 12);
     assert.equal(store.db.prepare('SELECT count(*) n FROM worker_logs').get().n, count);
     assert.equal(store.decrypt(store.rawAccount(account.id).password_ciphertext), accountInput.password);
     assert.equal(store.db.prepare('PRAGMA foreign_key_check').all().length, 0);

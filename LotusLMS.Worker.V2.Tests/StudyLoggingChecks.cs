@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json.Nodes;
 using LotusLMS.Api;
+using LotusLMS.Client;
 using LotusLMS.Worker.V2;
 using LotusLMS.Worker.V2.Accounts;
 using LotusLMS.Worker.V2.LotusRunner.CheckingTime;
@@ -58,10 +59,11 @@ internal static class StudyLoggingChecks
 
         fake.FailSave = true;
         logger.Entries.Clear();
+        var failedLessons = new List<ClientCurrentLesson?>();
         try
         {
             await service.RunAsync(session, [item], () => Task.FromResult(new StudyPlan([], true)),
-                (_, _) => Task.CompletedTask, default);
+                (_, _) => Task.CompletedTask, default, failedLessons.Add);
             throw new Exception("FAIL: failed save fixture should fail");
         }
         catch (LotusLmsApiException)
@@ -69,6 +71,8 @@ internal static class StudyLoggingChecks
             check(logger.Entries.Count(entry => entry.Message.StartsWith("PRACTICE_SEND ")) == 1
                 && !logger.Entries.Any(entry => entry.Message.StartsWith("PRACTICE_ACK ")),
                 "a failed or unconfirmed save never produces a successful acknowledgement log");
+            check(failedLessons.First()?.ItemIid == item.iid && failedLessons.Last() is null,
+                "a failed study request clears its current lesson before retry or finish");
         }
     }
 }

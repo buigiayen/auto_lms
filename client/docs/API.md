@@ -20,6 +20,15 @@ chuyển hướng sang `/login` khi chưa đăng nhập; API trả `401 AUTH_REQ
 | GET | `/api/auth/session` | `{ data: { authenticated, username } }`; username là null khi chưa đăng nhập |
 | POST | `/api/auth/login` | JSON `{ username, password }`; đối chiếu đúng thì cấp cookie và trả authenticated/username |
 | POST | `/api/auth/logout` | Hủy phiên ở server, xóa cookie và trả 204 |
+| GET | `/api/config` | Cần phiên quản trị; trả `{ data: { allowTextUsernames } }` để cấu hình ô nhập tài khoản |
+
+`allowTextUsernames` chỉ true khi server chạy với `NODE_ENV=development`.
+Trong môi trường này, `identityNumber` dùng cho tạo/sửa tài khoản có thể là
+username dài 1–100 ký tự, không chứa khoảng trắng/ký tự điều khiển, ví dụ
+`hv02`. Production và các môi trường khác bắt buộc chuỗi đúng 12 chữ số.
+Backend kiểm tra độc lập với form; client không thể đổi môi trường/quy tắc qua
+query, header hoặc payload. Trường vẫn giữ tên `identityNumber` và worker nhận
+đúng giá trị này trong `credentials.username`.
 
 Cookie `lotus_admin_session` dùng HttpOnly, SameSite=Strict, Path=/ và hết hạn
 sau 12 giờ. Đặt `CLIENT_SESSION_SECURE=true` khi sử dụng HTTPS. Token ngẫu nhiên
@@ -158,7 +167,9 @@ Các response thông tin tài khoản dùng cùng cấu trúc `data` trên. Khô
 `GET /api/accounts?search=worker-01&provider=truongson&status=stopped&page=1&pageSize=20`
 
 Thêm `mood=sleeping|awake|celebrating|angry` để lọc trạng thái mascot (Đang nghỉ,
-Thức giấc, Ăn mừng, Gặp lỗi). Bỏ qua hoặc để trống để xem tất cả. Bộ lọc kết hợp
+Thức giấc, Ăn mừng, Gặp lỗi). `mood=not-celebrating` giữ tất cả trạng thái trừ
+Ăn mừng (Hoàn thành); đây là lựa chọn mặc định của giao diện khi mở trang.
+Bỏ qua hoặc để trống tham số để xem tất cả. Bộ lọc kết hợp
 với `search`, `provider`, `status` và được áp dụng trước phân trang; `pagination.total`
 là tổng số kết quả phù hợp, còn `summary` vẫn thống kê toàn bộ tài khoản.
 Trạng thái mascot khớp với hình hiển thị, bao gồm lỗi ở log gần nhất của lượt
@@ -251,6 +262,11 @@ nhận ba trường sở hữu qua header `X-Worker-Run-Id`, `X-Worker-Instance-
 `X-Worker-Lease-Token`. Worker .NET dùng POST heartbeat mỗi 5 giây để gia hạn.
 Claim trả thông tin đăng nhập và cấu hình LMS/proxy cho Worker; API giao diện
 không trả mật khẩu. Xem [WORKER_QUEUE.md](WORKER_QUEUE.md) cho hợp đồng đầy đủ.
+
+Worker có thể gửi `currentLesson` trong heartbeat. API danh sách/chi tiết account
+trả lại qua `execution.currentLesson` gồm phần đang chạy, IID/tên bài cha và
+IID/tên/loại bài con. Client hiển thị trực tiếp trên thẻ tài khoản và cửa sổ
+thông tin; không phụ thuộc log gần nhất. Kết thúc lượt hoặc mất lease trả null.
 
 ## 6. Gửi và đọc log
 

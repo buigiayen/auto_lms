@@ -68,7 +68,7 @@ test('schema 8 migrates run sections to all and persists later choices without c
     store.setStatus(account.id, 'running', null, { enrolmentPlanIid: 99, enrolmentPlanName: 'Plan' }, ['review']);
     store.close(); store = new Store(directory);
     assert.deepEqual(store.account(account.id).runSections, ['review']);
-    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 10);
+    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 12);
     assert.deepEqual(store.db.prepare('PRAGMA foreign_key_check').all(), []);
   } finally { store.close(); rmSync(directory, { recursive: true }); }
 });
@@ -211,7 +211,7 @@ for (const legacyVersion of [5, 6]) test(`schema ${legacyVersion} to 7 preserves
     store.setStatus(account.id, 'running', null, { enrolmentPlanIid: 100, enrolmentPlanName: 'Chương trình B' });
     store.close(); store = new Store(directory);
     assert.equal(store.account(account.id).enrolmentPlanIid, 100); assert.equal(store.account(account.id).enrolmentPlanName, 'Chương trình B');
-    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 10);
+    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 12);
     assert.equal(store.db.prepare('PRAGMA foreign_key_check').all().length, 0);
   } finally { store.close(); rmSync(directory, { recursive: true }); }
 });

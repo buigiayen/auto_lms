@@ -30,7 +30,7 @@ nhiên khi khởi chạy.
 | Cột | Kiểu | Ý nghĩa |
 | --- | --- | --- |
 | `id` | TEXT, PK | UUID backend tự tạo |
-| `identity_number` | TEXT | Căn cước 12 chữ số, tên đăng nhập LMS |
+| `identity_number` | TEXT | Tên đăng nhập LMS: production đúng 12 chữ số; development cho phép username 1–100 ký tự |
 | `password_ciphertext` | TEXT | Mật khẩu được mã hóa để backend có thể dùng đăng nhập LMS |
 | `provider` | TEXT | `yenthuy` hoặc `truongson` |
 | `status` | TEXT | `running` hoặc `stopped`, mặc định `stopped` |
@@ -209,4 +209,27 @@ hôm sau; metadata phân biệt hai trường hợp và phát hiện retry mâu 
 
 Migration sao lưu vào `client.before-scheduled-rest.sqlite` trước khi thêm cột.
 Run cũ có metadata `{}`, vẫn đối chiếu outcome theo state cũ. Thông tin account,
-khóa, lượt chạy và log được giữ nguyên. `user_version` hiện tại là 10.
+khóa, lượt chạy và log được giữ nguyên.
+
+## 13. Username development (schema 11)
+
+`accounts.identity_number` giữ TEXT dài 1–100 ký tự để lưu username như `hv02`
+khi `NODE_ENV=development`. Server vẫn bắt buộc 12 chữ số trong production và
+mọi môi trường khác; các connection Store này thêm TEMP trigger để áp dụng
+giới hạn số cho INSERT/UPDATE ngay cả khi database đã từng dùng ở development.
+Quy tắc môi trường không được lưu vào database.
+
+Migration sao lưu `client.before-account-usernames.sqlite` rồi thay ràng buộc
+của bảng accounts trong transaction, giữ nguyên các cột/dữ liệu, chỉ mục,
+trigger và kiểm tra khóa ngoại trước commit. Tài khoản, thông tin mã hóa,
+thiết bị, proxy, lịch nghỉ, lượt chạy và log được giữ nguyên.
+## 14. Bài đang xử lý (schema 12)
+
+`worker_runs.current_lesson_json` lưu snapshot JSON của bài đang chạy, gồm phần
+chạy, IID/tên bài cha và IID/tên/loại bài con. NULL nghĩa là chưa có bài đang
+xử lý. Heartbeat chỉ cập nhật snapshot của đúng chủ sở hữu lượt chạy; finish
+và hết lease xóa snapshot. API chỉ trả bài hiện tại cho lượt còn hoạt động.
+
+Migration sao lưu `client.before-current-lesson.sqlite` trước khi thêm cột,
+giữ nguyên tài khoản, lượt chạy, khóa mã hóa, log và các liên kết hiện có.
+`user_version` hiện tại là 12.

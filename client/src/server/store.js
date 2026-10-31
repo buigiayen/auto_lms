@@ -7,6 +7,7 @@ import { isProxyExpired, proxyExpiresAt } from './proxy-expiry.js';
 import { WorkerQueue } from './worker-queue.js';
 import { accountMood } from '../public/account-mood.js';
 import { validateRunSections } from './run-sections.js';
+import { accountIdentityPolicy, isValidAccountIdentity } from '../public/account-identity.js';
 
 const providers = ['yenthuy', 'truongson'];
 const now = () => new Date().toISOString();
@@ -43,8 +44,9 @@ const publicAccount = (row, at) => ({
 });
 
 export class Store {
-  constructor(directory, { clock = Date.now, dailyResumeOffsetSeconds } = {}) {
+  constructor(directory, { clock = Date.now, dailyResumeOffsetSeconds, environment = process.env.NODE_ENV } = {}) {
     this.clock = clock;
+    this.allowTextUsernames = environment === 'development';
     this.directory = directory;
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     const keyFile = join(directory, 'credential.key');
@@ -90,15 +92,57 @@ export class Store {
       if (!existsSync(backup)) this.db.prepare('VACUUM INTO ?').run(backup);
       this.db.exec("ALTER TABLE worker_runs ADD COLUMN finish_details_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(finish_details_json) AND json_type(finish_details_json) = 'object')");
     }
+    if (!this.db.prepare('PRAGMA table_info(worker_runs)').all().some(column => column.name === 'current_lesson_json')) {
+      const backup = join(directory, 'client.before-current-lesson.sqlite');
+      if (!existsSync(backup)) this.db.prepare('VACUUM INTO ?').run(backup);
+      this.db.exec("ALTER TABLE worker_runs ADD COLUMN current_lesson_json TEXT CHECK (current_lesson_json IS NULL OR (json_valid(current_lesson_json) AND json_type(current_lesson_json) = 'object'))");
+    }
     if (!accountColumns.includes('run_sections_json')) {
       const backup = join(directory, 'client.before-run-sections.sqlite');
       if (!existsSync(backup)) this.db.prepare('VACUUM INTO ?').run(backup);
       this.db.exec(`ALTER TABLE accounts ADD COLUMN run_sections_json TEXT NOT NULL DEFAULT '["exam","review","theory","practical"]'`);
     }
-    this.db.exec('PRAGMA user_version=10');
+    this.migrateAccountIdentity();
+    if (!this.allowTextUsernames) {
+      // TEMP triggers apply this connection's environment policy without persisting dev/prod flags in the database.
+      this.db.exec(`CREATE TEMP TRIGGER production_identity_insert BEFORE INSERT ON main.accounts
+        WHEN length(NEW.identity_number) != 12 OR NEW.identity_number GLOB '*[^0-9]*'
+        BEGIN SELECT RAISE(ABORT, 'Production identity must contain exactly 12 digits.'); END;
+        CREATE TEMP TRIGGER production_identity_update BEFORE UPDATE OF identity_number ON main.accounts
+        WHEN length(NEW.identity_number) != 12 OR NEW.identity_number GLOB '*[^0-9]*'
+        BEGIN SELECT RAISE(ABORT, 'Production identity must contain exactly 12 digits.'); END;`);
+    }
+    this.db.exec('PRAGMA user_version=12');
     this.queue = new WorkerQueue(this, { dailyResumeOffsetSeconds });
     this.workerKeyFile = join(directory, 'worker-api-keys.json');
     this.workerKeys = Object.assign(Object.create(null), existsSync(this.workerKeyFile) ? JSON.parse(readFileSync(this.workerKeyFile, 'utf8')) : {});
+  }
+
+  migrateAccountIdentity() {
+    const table = this.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='accounts'").get();
+    const legacyCheck = /CHECK\s*\(\s*length\s*\(\s*identity_number\s*\)\s*=\s*12\s+AND\s+identity_number\s+NOT\s+GLOB\s+'\*\[\^0-9\]\*'\s*\)/i;
+    if (!legacyCheck.test(table.sql)) return;
+    const backup = join(this.directory, 'client.before-account-usernames.sqlite');
+    if (!existsSync(backup)) this.db.prepare('VACUUM INTO ?').run(backup);
+    const create = table.sql.replace(legacyCheck, 'CHECK (length(identity_number) BETWEEN 1 AND 100)')
+      .replace(/^CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(?:"accounts"|accounts)\s*\(/i, 'CREATE TABLE accounts_identity_migration (');
+    const columns = this.db.prepare('PRAGMA table_info(accounts)').all()
+      .map(column => '"' + column.name.replaceAll('"', '""') + '"').join(',');
+    const objects = this.db.prepare("SELECT sql FROM sqlite_master WHERE tbl_name='accounts' AND type IN ('index','trigger') AND sql IS NOT NULL").all();
+    this.db.exec('PRAGMA foreign_keys=OFF');
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.exec(create);
+      this.db.exec('INSERT INTO accounts_identity_migration (' + columns + ') SELECT ' + columns + ' FROM accounts');
+      this.db.exec('DROP TABLE accounts; ALTER TABLE accounts_identity_migration RENAME TO accounts');
+      for (const object of objects) this.db.exec(object.sql);
+      if (this.db.prepare('PRAGMA foreign_key_check').all().length)
+        throw new Error('Account username migration failed foreign-key validation.');
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    } finally { this.db.exec('PRAGMA foreign_keys=ON'); }
   }
 
   migrateProxyExpiry() {
@@ -232,7 +276,7 @@ export class Store {
   listAccounts(query, paging) {
     this.queue.reap();
     const mood = query.get('mood');
-    requireValue(!mood || ['sleeping', 'awake', 'celebrating', 'angry'].includes(mood), 'Bộ lọc không hợp lệ.', 'mood');
+    requireValue(!mood || ['sleeping', 'awake', 'celebrating', 'angry', 'not-celebrating'].includes(mood), 'Bộ lọc không hợp lệ.', 'mood');
     const clauses = [], params = [];
     for (const [field, column, allowed] of [['provider', 'provider', providers], ['status', 'status', ['running', 'stopped']]]) {
       if (query.get(field)) {
@@ -253,7 +297,8 @@ export class Store {
       .map(row => ({ ...publicAccount(row, this.clock()), execution: this.queue.execution(row) }));
     if (mood) {
       // Match the displayed mood before paginating, including current-run errors.
-      data = data.filter(account => accountMood(account) === mood);
+      data = data.filter(account => mood === 'not-celebrating'
+        ? accountMood(account) !== 'celebrating' : accountMood(account) === mood);
       total = data.length;
       data = data.slice(paging.offset, paging.offset + paging.pageSize);
     }
@@ -277,7 +322,8 @@ export class Store {
     const teacherInput = own(input, 'managingTeacher') ? input.managingTeacher : previous?.managing_teacher ?? '';
     requireValue(typeof teacherInput === 'string' && teacherInput.length <= 200, 'Giáo viên quản lý tối đa 200 ký tự.', 'managingTeacher');
     const managingTeacher = teacherInput.trim();
-    requireValue(typeof identity === 'string' && /^\d{12}$/.test(identity), 'Căn cước phải gồm đúng 12 chữ số.', 'identityNumber');
+    requireValue(isValidAccountIdentity(identity, this.allowTextUsernames),
+      accountIdentityPolicy(this.allowTextUsernames).message, 'identityNumber');
     requireValue(providers.includes(provider), 'Nhà cung cấp không hợp lệ.', 'provider');
     requireValue(typeof workerName === 'string' && workerName.length > 0 && workerName.length <= 100, 'Tên worker dài từ 1–100 ký tự.', 'workerName');
     if (!id || own(input, 'password')) requireValue(typeof input.password === 'string' && input.password.length > 0 && input.password.length <= 1024, 'Mật khẩu không được để trống.', 'password');

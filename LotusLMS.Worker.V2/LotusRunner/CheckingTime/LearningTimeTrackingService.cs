@@ -68,9 +68,11 @@ public sealed class LearningTimeTrackingService(
         var practiceNotPass = FillterCourse(leafStudy, "Ôn luyện");
         foreach (var item in practiceNotPass)
         {
+            var practice = item.__Expand?.Syllabus?.children?.FirstOrDefault(c => c?.ntype == "practice");
             CheckingTimeDTO.AutoStudy autoStudy = new CheckingTimeDTO.AutoStudy();
-            autoStudy.name = item.Name;
-            autoStudy.iid = item.__Expand?.Syllabus?.children?.FirstOrDefault(c => c?.ntype == "practice")?.iid ?? 0;
+            autoStudy.name = practice?.name ?? item.Name;
+            autoStudy.courseName = item.Name;
+            autoStudy.iid = practice?.iid ?? 0;
             autoStudy.iidRoot = item.Iid;
             autoStudy.typeAutoStudy = item.Name?.Contains("Mô phỏng các tình huống giao thông", StringComparison.CurrentCultureIgnoreCase) == true
                                     ? CheckingTimeDTO.TypeAutoStudy.PracticeSpecialOnly
@@ -99,6 +101,7 @@ public sealed class LearningTimeTrackingService(
             {
                 CheckingTimeDTO.AutoStudy autoStudy = new CheckingTimeDTO.AutoStudy();
                 autoStudy.name = i.Name;
+                autoStudy.courseName = item.Name;
                 autoStudy.iid = i.Iid;
                 autoStudy.ntype = i.Ntype ?? "video";
                 autoStudy.typeAutoStudy = CheckingTimeDTO.TypeAutoStudy.AutoStudy;

@@ -52,6 +52,25 @@ var beat = await client.HeartbeatAsync(accountId, owner);
 Check(handler.Uri!.AbsolutePath.EndsWith("/heartbeat") && handler.Json?["leaseToken"]?.GetValue<string>() == leaseToken, "heartbeat sends ownership in JSON");
 Check(beat.EnrolmentPlanIid == 99 && beat.EnrolmentPlanName == "Chương trình A", "heartbeat includes selected enrolment plan fields");
 Check(beat.LeaseExpiresAt - beat.ServerTime == TimeSpan.FromSeconds(30), "lease timestamps deserialize without timezone loss");
+var currentLesson = new ClientCurrentLesson
+{
+    Section = "theory", CourseIid = 110, CourseName = "Bài cha", ItemIid = 221, ItemName = "Bài con", ItemType = "video"
+};
+await client.HeartbeatAsync(accountId, new ClientHeartbeatRequest
+    { RunId = runId, InstanceId = instanceId, LeaseToken = leaseToken, CurrentLesson = currentLesson });
+Check(handler.Json?["currentLesson"]?["courseName"]?.GetValue<string>() == "Bài cha"
+    && handler.Json?["currentLesson"]?["itemName"]?.GetValue<string>() == "Bài con",
+    "heartbeat serializes both parent and child through the ownership-compatible SDK method");
+await client.HeartbeatAsync(accountId, new ClientHeartbeatRequest
+    { RunId = runId, InstanceId = instanceId, LeaseToken = leaseToken });
+Check(handler.Json!.AsObject().ContainsKey("currentLesson") && handler.Json["currentLesson"] is null,
+    "heartbeat serializes an explicit null to clear the current lesson");
+handler.Body = new JsonObject { ["data"] = new JsonObject
+    { ["id"] = accountId, ["execution"] = new JsonObject { ["state"] = "running",
+        ["currentLesson"] = System.Text.Json.JsonSerializer.SerializeToNode(currentLesson, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)) } } }.ToJsonString();
+Check((await client.GetAccountAsync(accountId)).Execution?.CurrentLesson?.CourseName == "Bài cha",
+    "account execution deserializes the current lesson snapshot");
+handler.Body = new JsonObject { ["data"] = control.DeepClone() }.ToJsonString();
 await client.GetControlAsync(accountId, owner);
 Check(handler.Method == HttpMethod.Get && handler.BodyReceived is null && handler.RunHeader == runId && handler.LeaseHeader == leaseToken && handler.InstanceHeader == instanceId, "read-only control sends ownership in headers");
 Check(!handler.Uri!.ToString().Contains(leaseToken), "lease token never appears in a query string");

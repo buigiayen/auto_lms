@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS proxies (
 CREATE TABLE IF NOT EXISTS accounts (
     id TEXT PRIMARY KEY NOT NULL,
     identity_number TEXT NOT NULL
-        CHECK (length(identity_number) = 12 AND identity_number NOT GLOB '*[^0-9]*'),
+        CHECK (length(identity_number) BETWEEN 1 AND 100),
     password_ciphertext TEXT NOT NULL CHECK (length(password_ciphertext) > 0),
     provider TEXT NOT NULL CHECK (provider IN ('yenthuy', 'truongson')),
     status TEXT NOT NULL DEFAULT 'stopped' CHECK (status IN ('running', 'stopped')),
@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS worker_runs (
     last_heartbeat_at TEXT NOT NULL,
     lease_expires_at TEXT NOT NULL,
     finished_at TEXT,
+    current_lesson_json TEXT CHECK (current_lesson_json IS NULL OR (json_valid(current_lesson_json) AND json_type(current_lesson_json) = 'object')),
     finish_details_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(finish_details_json) AND json_type(finish_details_json) = 'object'),
     UNIQUE(worker_name,instance_id,request_id)
 );

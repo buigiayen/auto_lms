@@ -44,7 +44,7 @@ test('dates validate and persist; migration preserves account assignments, passw
     assert.equal(store.proxy(proxy.id, true).password, 'new-secret');
     assert.equal(store.account(account.id).proxyId, proxy.id);
     assert.equal(store.rawAccount(account.id).device_uuid, device);
-    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 10);
+    assert.equal(store.db.prepare('PRAGMA user_version').get().user_version, 12);
     store.saveProxy({ ...withoutDate, expiresOn }, proxy.id);
     store.saveProxy({ ...withoutDate, expiresOn: null }, proxy.id);
     assert.equal(store.proxy(proxy.id).expiresOn, null);

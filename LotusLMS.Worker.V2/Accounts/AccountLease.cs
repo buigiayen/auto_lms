@@ -21,7 +21,7 @@ internal sealed class AccountLease(ILotusClient client, IOptions<WorkerOptions> 
                 var started = clock.GetTimestamp();
                 try
                 {
-                    var control = await client.HeartbeatAsync(context.AccountId, context.Ownership, request.Token);
+                    var control = await client.HeartbeatAsync(context.AccountId, context.CreateHeartbeat(), request.Token);
                     context.UpdateControl(control, started);
                 }
                 catch (LotusClientException error) when (BackendErrors.IsTemporary(error))

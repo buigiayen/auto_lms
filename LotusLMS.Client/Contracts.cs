@@ -56,6 +56,7 @@ public sealed class ClientExecution
     public DateTimeOffset? LastHeartbeatAt { get; init; }
     public DateTimeOffset? LeaseExpiresAt { get; init; }
     public ClientActivity? LastLog { get; init; }
+    public ClientCurrentLesson? CurrentLesson { get; init; }
     public DateTimeOffset? AvailableAfter { get; init; }
     public string? DeferReason { get; init; }
 }
@@ -81,6 +82,22 @@ public class ClientRunOwnership
     public required string RunId { get; init; }
     public required string InstanceId { get; init; }
     public required string LeaseToken { get; init; }
+}
+
+public sealed class ClientCurrentLesson
+{
+    public required string Section { get; init; }
+    public required int CourseIid { get; init; }
+    public required string CourseName { get; init; }
+    public required int ItemIid { get; init; }
+    public required string ItemName { get; init; }
+    public required string ItemType { get; init; }
+}
+
+public sealed class ClientHeartbeatRequest : ClientRunOwnership
+{
+    // Null explicitly clears the previous lesson; legacy ownership-only requests keep it.
+    public ClientCurrentLesson? CurrentLesson { get; init; }
 }
 
 public sealed class ClientFinishRequest : ClientRunOwnership

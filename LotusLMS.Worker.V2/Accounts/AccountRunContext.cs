@@ -20,6 +20,7 @@ internal sealed class AccountRunContext : IDisposable
     private bool _disposed;
     private long _deadline;
     private string _identityNumber;
+    private ClientCurrentLesson? _currentLesson;
     public AccountRunContext(ClientAssignment assignment, ClientProxy? proxy, string accountId, string workerName,
         string instanceId, long requestStarted, TimeProvider clock, string identityNumber)
     {
@@ -49,6 +50,23 @@ internal sealed class AccountRunContext : IDisposable
     public CancellationToken StoppingToken => _stop.Token;
     public string StopReason { get; private set; } = "Đã yêu cầu dừng Worker.";
     public bool LeaseLost { get; private set; }
+    public void ReportCurrentLesson(ClientCurrentLesson? lesson)
+    {
+        lock (_gate)
+        {
+            if (!_disposed && !_stop.IsCancellationRequested) _currentLesson = lesson;
+        }
+    }
+
+    public ClientHeartbeatRequest CreateHeartbeat()
+    {
+        lock (_gate)
+            return new ClientHeartbeatRequest
+            {
+                RunId = Ownership.RunId, InstanceId = Ownership.InstanceId,
+                LeaseToken = Ownership.LeaseToken, CurrentLesson = _currentLesson
+            };
+    }
     public int? ScheduledRestSeconds { get { lock (_gate) return _scheduledRestSeconds; } }
     public TimeSpan RemainingLease => TimeSpan.FromSeconds(
         (Interlocked.Read(ref _deadline) - _clock.GetTimestamp()) / (double)_clock.TimestampFrequency);
@@ -130,6 +148,7 @@ internal sealed class AccountRunContext : IDisposable
             if (_disposed || _stop.IsCancellationRequested) return;
             StopReason = reason;
             LeaseLost = leaseLost;
+            _currentLesson = null;
             _timer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             _restTimer?.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             _stop.Cancel();

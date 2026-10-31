@@ -82,6 +82,28 @@ test('account API filters all mascot moods before pagination and combines existi
     assert.equal((await get('mood=celebrating&status=running')).pagination.total, 0);
     assert.equal((await get('mood=')).pagination.total, sequence);
     assert.equal((await get('')).pagination.total, sequence);
+    const visibleIds = [sleeping.id, awake.id, failed.id, deferred.id, errored.id].sort();
+    const visible = await get('mood=not-celebrating');
+    assert.equal(visible.status, 200);
+    assert.deepEqual(visible.data.map(account => account.id).sort(), visibleIds);
+    assert.equal(visible.pagination.total, visibleIds.length);
+    assert.equal(visible.summary.total, sequence, 'global statistics still include completed accounts');
+    const paginated = [];
+    for (let page = 1; page <= 3; page++) {
+      const result = await get(`mood=not-celebrating&pageSize=2&page=${page}`);
+      assert.equal(result.pagination.total, visibleIds.length);
+      paginated.push(...result.data.map(account => account.id));
+    }
+    assert.deepEqual(paginated.sort(), visibleIds, 'excluded mascots do not leave gaps or duplicates across pages');
+    const combinedVisible = await get(`mood=not-celebrating&status=running&provider=yenthuy&search=${errored.identityNumber}`);
+    assert.deepEqual(combinedVisible.data.map(account => account.id), [errored.id]);
+    finish(awake, 'completed');
+    const refreshed = await get('mood=not-celebrating');
+    assert.equal(refreshed.pagination.total, visibleIds.length - 1);
+    assert.ok(!refreshed.data.some(account => account.id === awake.id), 'completed mascots disappear on the next refresh');
+    const html = await (await fetch(origin + '/')).text();
+    assert.match(html, /<select id="mascot-filter"[^>]*>\s*<option value="not-celebrating" selected>/,
+      'the browser starts with completed mascots hidden');
     const invalid = await get('mood=unknown');
     assert.equal(invalid.status, 400);
     assert.equal(invalid.error.code, 'VALIDATION_ERROR');

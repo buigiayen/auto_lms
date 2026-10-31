@@ -6,6 +6,7 @@ services:
     image: lotuslms-client:local
     restart: unless-stopped
     environment:
+      NODE_ENV: ${NODE_ENV:-production}
       PORT: 3100
       CLIENT_HOST: client
       CLIENT_LISTEN_HOST: 0.0.0.0

@@ -96,6 +96,12 @@ const lms = createServer(async (req, res) => {
         const itemId = Number(form.get('item_iid'));
         assert.ok(itemIds.includes(itemId));
         assert.ok(user.progress[itemId] < requiredSeconds, 'worker must not submit an item already completed by this account');
+        await until(() => app.store.account(user.accountId).execution.currentLesson?.itemIid === itemId,
+          'heartbeat publishes the lesson before its save completes');
+        assert.deepEqual(app.store.account(user.accountId).execution.currentLesson, {
+          section: 'theory', courseIid: course, courseName: 'Shared course',
+          itemIid: itemId, itemName: `Shared video ${itemId}`, itemType: 'video'
+        }, 'each real worker lane reports the correct parent and child to the backend');
         if (user === users[0] && user.saves === 0) {
           blockedFirstSave = true;
           // Account B must complete while account A is waiting on its own LMS request.
@@ -147,6 +153,8 @@ try {
   assert.notEqual(users[0].device, users[1].device);
   for (const user of users)
     assert.deepEqual(user.savedItems, user.expectedItems, 'account submits exactly its own pending items in order');
+  for (const user of users)
+    assert.equal(app.store.account(user.accountId).execution.currentLesson, null, 'finished runs clear the displayed lesson');
   assert.ok(blockedFirstSave);
   const lines = output.replace(/\u001b\[[\d;]*m/g, '').split('\n');
   const allSends = lines.filter(line => line.includes('THEORY_SEND '));

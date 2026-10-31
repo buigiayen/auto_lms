@@ -20,7 +20,7 @@ test('Node signing matches all captured CryptoJS and client-sync fixtures', () =
 });
 
 test('SQLite persists encrypted credentials, leading zeroes, GUID, status, and proxy password', () => {
-  const directory = temp(); let store = new Store(directory);
+  const directory = temp(); let store = new Store(directory, { environment: 'production' });
   try {
     const account = store.saveAccount(input), id = account.id;
     assert.equal(account.identityNumber, input.identityNumber);

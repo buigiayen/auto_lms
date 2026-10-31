@@ -1,4 +1,5 @@
 import { accountMood } from "./account-mood.js";
+import { accountIdentityPolicy } from "./account-identity.js";
 
 const $ = (selector) => document.querySelector(selector);
 const icon = (name) => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
@@ -174,6 +175,11 @@ function accountInformation(account) {
     ["Hoạt động", executionLabels[execution?.state] || "Đã dừng"],
     ["Chương trình", account.enrolmentPlanIid ? `${account.enrolmentPlanName || "Chương trình học"} · IID ${account.enrolmentPlanIid}` : "Chưa chọn"],
     ["Phần cần chạy", runSectionSummary(account)],
+    ...(execution?.currentLesson ? [
+      ["Phần đang chạy", runSectionNames[execution.currentLesson.section] || execution.currentLesson.section],
+      ["Bài cha đang chạy", execution.currentLesson.courseName],
+      ["Bài con đang chạy", execution.currentLesson.itemName],
+    ] : []),
     ["Proxy", account.proxy ? `${account.proxy.name} · ${account.proxy.address}${account.proxy.enabled ? "" : " · Đang tắt"}` : "Kết nối trực tiếp"],
     ...(account.proxy ? [["Hạn proxy", account.proxy.expiresOn || "Chưa đặt"]] : []),
     ["Mật khẩu", account.hasPassword ? "Đã lưu, được mã hóa" : "Chưa lưu"],
@@ -193,6 +199,7 @@ function accountStation(account) {
   return `<article class="account-station station-${mood}" data-station-id="${escape(account.id)}">
     <div class="station-heading"><span class="provider-tag"><span class="provider-symbol ${account.provider === "truongson" ? "blue" : ""}">${account.provider === "truongson" ? "T" : "Y"}</span>${providerName(account.provider)}</span><span class="station-status"><i></i>${mascotMoodLabels[mood]}</span></div>
     <div class="mascot-target">
+      ${mascotSpeech(account.execution?.currentLesson)}
       <button class="mascot-button" data-action="account" data-id="${escape(account.id)}" aria-label="Mở thao tác tài khoản ${escape(account.identityNumber)}" aria-describedby="account-tip-${escape(account.id)}" aria-haspopup="dialog">${mascotScene(account)}<span class="mascot-invitation">Chọn tôi để thao tác ${icon("arrow")}</span></button>
       <div class="mascot-tooltip" id="account-tip-${escape(account.id)}" role="tooltip"><strong>Hồ sơ tài khoản</strong>${accountInformation(account)}</div>
     </div>
@@ -200,6 +207,15 @@ function accountStation(account) {
     <button class="worker-nameplate" data-action="logs" data-id="${escape(account.id)}" aria-label="Xem log của ${escape(accountWorker(account))}, tài khoản ${escape(account.identityNumber)}">${icon("server")}<span>${escape(accountWorker(account))}</span>${icon("log")}</button>
     <p class="station-activity" title="${escape(account.execution?.lastLog?.message || "")}">${escape(account.execution?.lastLog?.message || mascotMoodMessages[mood])}</p>
   </article>`;
+}
+
+function mascotSpeech(lesson) {
+  return `<div class="mascot-speech" role="status" aria-live="polite" aria-atomic="true"${lesson ? "" : " hidden"}>${lesson ? `<span class="mascot-speech-intro">Tôi đang xử lý:</span> <p><strong>${escape(runSectionNames[lesson.section] || lesson.section)}:</strong> ${escape(lesson.courseName)} <span class="mascot-speech-plus">+</span> ${escape(lesson.itemName)}</p>` : ""}</div>`;
+}
+
+function currentLessonInformation(lesson) {
+  if (!lesson) return "";
+  return `<div class="station-current-lesson"><span class="current-lesson-section">ĐANG CHẠY · ${escape(runSectionNames[lesson.section] || lesson.section)}</span><div><span>Bài cha</span><strong>${escape(lesson.courseName)}</strong></div><div><span>Bài con</span><strong>${escape(lesson.itemName)}</strong></div></div>`;
 }
 
 function renderAccountStations(accounts, total) {
@@ -228,10 +244,11 @@ function renderAccountStations(accounts, total) {
         const scene = node.querySelector(".mascot-scene");
         const sceneClass = next.querySelector(".mascot-scene").getAttribute("class");
         if (scene.getAttribute("class") !== sceneClass) scene.setAttribute("class", sceneClass);
-        for (const selector of [".station-heading", ".mascot-tooltip", ".station-account", ".worker-nameplate", ".station-activity"]) {
+        for (const selector of [".station-heading", ".mascot-speech", ".mascot-tooltip", ".station-account", ".worker-nameplate", ".station-activity"]) {
           const current = node.querySelector(selector), replacement = next.querySelector(selector);
           if (current.innerHTML !== replacement.innerHTML) current.innerHTML = replacement.innerHTML;
         }
+        node.querySelector(".mascot-speech").hidden = next.querySelector(".mascot-speech").hidden;
         for (const [selector, attribute] of [[".mascot-button", "aria-label"], [".worker-nameplate", "aria-label"], [".station-activity", "title"]])
           node.querySelector(selector).setAttribute(attribute, next.querySelector(selector).getAttribute(attribute));
       } else node = next;
@@ -250,9 +267,25 @@ function accountActions(account) {
   const epoch = openDialog(
     `Tài khoản ${account.identityNumber}`,
     `${providerName(account.provider)} · ${accountWorker(account)}`,
-    `<div class="dialog-body account-actions-body"><div class="account-action-preview ${account.provider === "yenthuy" ? "station-yenthuy" : ""}">${mascotScene(account)}<span class="badge ${account.status}">${account.status === "running" ? "Treo" : "Dừng treo"} · ${executionLabels[account.execution?.state] || "Đã dừng"}</span></div><div class="mascot-actions"><button class="mascot-action" data-action="toggle" data-id="${escape(account.id)}">${icon(account.status === "running" ? "pause" : "play")}<span><strong>${account.status === "running" ? "Dừng treo" : "Run tài khoản"}</strong><small>${account.status === "running" ? "Cho mascot nghỉ và dừng công việc" : "Chọn chương trình học và bắt đầu"}</small></span>${icon("arrow")}</button><button class="mascot-action" data-action="edit" data-id="${escape(account.id)}">${icon("edit")}<span><strong>Sửa thông tin</strong><small>Cập nhật tài khoản, giáo viên và proxy</small></span>${icon("arrow")}</button><button class="mascot-action" data-action="details" data-id="${escape(account.id)}">${icon("grid")}<span><strong>Xem chi tiết</strong><small>Mở chương trình và thông tin học tập</small></span>${icon("arrow")}</button></div><details class="account-profile"><summary>Thông tin đầy đủ của tài khoản</summary>${accountInformation(account)}</details></div>`,
+    `<div class="dialog-body account-actions-body"><div class="account-action-preview ${account.provider === "yenthuy" ? "station-yenthuy" : ""}">${mascotScene(account)}<span class="badge ${account.status}">${account.status === "running" ? "Treo" : "Dừng treo"} · ${executionLabels[account.execution?.state] || "Đã dừng"}</span></div><div id="account-current-lesson">${currentLessonInformation(account.execution?.currentLesson)}</div><div class="mascot-actions"><button class="mascot-action" data-action="toggle" data-id="${escape(account.id)}">${icon(account.status === "running" ? "pause" : "play")}<span><strong>${account.status === "running" ? "Dừng treo" : "Run tài khoản"}</strong><small>${account.status === "running" ? "Cho mascot nghỉ và dừng công việc" : "Chọn chương trình học và bắt đầu"}</small></span>${icon("arrow")}</button><button class="mascot-action" data-action="edit" data-id="${escape(account.id)}">${icon("edit")}<span><strong>Sửa thông tin</strong><small>Cập nhật tài khoản, giáo viên và proxy</small></span>${icon("arrow")}</button><button class="mascot-action" data-action="details" data-id="${escape(account.id)}">${icon("grid")}<span><strong>Xem chi tiết</strong><small>Mở chương trình và thông tin học tập</small></span>${icon("arrow")}</button></div><details class="account-profile"><summary>Thông tin đầy đủ của tài khoản</summary><div id="account-profile-information">${accountInformation(account)}</div></details></div>`,
   );
-  state.modal = { type: "account-actions", epoch, account };
+  const modal = state.modal = { type: "account-actions", epoch, account, controller: new AbortController() };
+  let loading = false;
+  const refresh = async () => {
+    if (loading) return;
+    loading = true;
+    try {
+      const { data } = await api(`/api/accounts/${encodeURIComponent(account.id)}`, { signal: modal.controller.signal });
+      if (state.modal !== modal) return;
+      modal.account = data;
+      $("#account-current-lesson").innerHTML = currentLessonInformation(data.execution?.currentLesson);
+      $("#account-profile-information").innerHTML = accountInformation(data);
+    } catch {
+      // Keep the last snapshot while offline; closing the dialog aborts this request.
+    } finally { loading = false; }
+  };
+  refresh();
+  modal.timer = setInterval(refresh, 5000);
 }
 
 async function loadAccounts() {
@@ -550,7 +583,15 @@ function runAccount(account) {
   });
 }
 
-function accountForm(account) {
+async function accountForm(account) {
+  let identityPolicy;
+  try {
+    const { data } = await api('/api/config');
+    identityPolicy = accountIdentityPolicy(data.allowTextUsernames);
+  } catch (error) {
+    toast(error.message, true);
+    return;
+  }
   const editing = Boolean(account);
   const busy = ["accepted", "running", "stopping"].includes(
     account?.execution?.state,
@@ -560,7 +601,7 @@ function accountForm(account) {
     editing
       ? `Cập nhật thông tin ${account.identityNumber}`
       : "Kết nối tài khoản LMS vào không gian của bạn.",
-    `<form id="account-form"><div class="dialog-body"><div class="field-row"><label>Căn cước<input name="identityNumber" id="identityNumber" required inputmode="numeric" pattern="[0-9]{12}" maxlength="12" placeholder="12 chữ số" value="${escape(account?.identityNumber)}" autocomplete="off"></label><label>Nhà cung cấp<select name="provider"><option value="truongson" ${account?.provider === "truongson" ? "selected" : ""}>Trường Sơn</option><option value="yenthuy" ${account?.provider === "yenthuy" ? "selected" : ""}>Yên Thủy</option></select></label></div><div class="field-row"><label>Mật khẩu<input name="password" id="password" type="password" ${editing ? "" : "required"} maxlength="1024" placeholder="${editing ? "Giữ mật khẩu hiện tại" : "Mật khẩu đăng nhập LMS"}" autocomplete="new-password"></label><label>Tên worker (tùy chọn)<input name="workerName" id="workerName" maxlength="100" placeholder="Tự cập nhật khi Worker tiếp nhận" value="${escape(account?.workerName === "unassigned" ? "" : account?.workerName)}" autocomplete="off"></label></div><label class="teacher-field">Giáo viên quản lý<input name="managingTeacher" id="managingTeacher" maxlength="200" placeholder="Nhập tên giáo viên quản lý" value="${escape(account?.managingTeacher)}" autocomplete="off"></label><fieldset class="proxy-picker account-proxy-field"><legend>Proxy</legend><div id="account-proxy">Đang tải cấu hình proxy…</div></fieldset>${!editing ? '<label>Trạng thái ban đầu<select name="status"><option value="stopped">Dừng treo</option><option value="running">Treo</option></select></label>' : ""}<p class="field-help">${busy ? "Worker đang chạy. Bạn có thể cập nhật Giáo viên quản lý; dừng Worker trước khi sửa thông tin khác." : editing ? "Để trống mật khẩu để giữ nguyên. Thay đổi thông tin đăng nhập sẽ đóng phiên xem chi tiết cũ." : "Thông tin được lưu trên máy. GUID thiết bị được tạo tự động."}</p><div id="account-form-error" class="inline-error" role="alert" hidden></div></div><div class="dialog-footer"><button type="button" class="button" data-close>Hủy</button><button class="button primary" type="submit">${icon("check")}${editing ? "Lưu thay đổi" : "Tạo tài khoản"}</button></div></form>`,
+    `<form id="account-form"><div class="dialog-body"><div class="field-row"><label>${escape(identityPolicy.label)}<input name="identityNumber" id="identityNumber" required inputmode="${identityPolicy.inputMode}" pattern="${escape(identityPolicy.pattern)}" maxlength="${identityPolicy.maxLength}" placeholder="${escape(identityPolicy.placeholder)}" value="${escape(account?.identityNumber)}" autocomplete="off"></label><label>Nhà cung cấp<select name="provider"><option value="truongson" ${account?.provider === "truongson" ? "selected" : ""}>Trường Sơn</option><option value="yenthuy" ${account?.provider === "yenthuy" ? "selected" : ""}>Yên Thủy</option></select></label></div><div class="field-row"><label>Mật khẩu<input name="password" id="password" type="password" ${editing ? "" : "required"} maxlength="1024" placeholder="${editing ? "Giữ mật khẩu hiện tại" : "Mật khẩu đăng nhập LMS"}" autocomplete="new-password"></label><label>Tên worker (tùy chọn)<input name="workerName" id="workerName" maxlength="100" placeholder="Tự cập nhật khi Worker tiếp nhận" value="${escape(account?.workerName === "unassigned" ? "" : account?.workerName)}" autocomplete="off"></label></div><label class="teacher-field">Giáo viên quản lý<input name="managingTeacher" id="managingTeacher" maxlength="200" placeholder="Nhập tên giáo viên quản lý" value="${escape(account?.managingTeacher)}" autocomplete="off"></label><fieldset class="proxy-picker account-proxy-field"><legend>Proxy</legend><div id="account-proxy">Đang tải cấu hình proxy…</div></fieldset>${!editing ? '<label>Trạng thái ban đầu<select name="status"><option value="stopped">Dừng treo</option><option value="running">Treo</option></select></label>' : ""}<p class="field-help">${busy ? "Worker đang chạy. Bạn có thể cập nhật Giáo viên quản lý; dừng Worker trước khi sửa thông tin khác." : editing ? "Để trống mật khẩu để giữ nguyên. Thay đổi thông tin đăng nhập sẽ đóng phiên xem chi tiết cũ." : "Thông tin được lưu trên máy. GUID thiết bị được tạo tự động."}</p><div id="account-form-error" class="inline-error" role="alert" hidden></div></div><div class="dialog-footer"><button type="button" class="button" data-close>Hủy</button><button class="button primary" type="submit">${icon("check")}${editing ? "Lưu thay đổi" : "Tạo tài khoản"}</button></div></form>`,
   );
   state.modal = { type: "account", epoch };
   const saveButton = $("#account-form button[type=submit]");

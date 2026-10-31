@@ -1,4 +1,5 @@
 using LotusLMS.Api;
+using LotusLMS.Client;
 using LotusLMS.Worker.V2.LotusRunner.CheckingTime;
 using LotusLMS.Worker2;
 using Microsoft.Extensions.Options;
@@ -17,7 +18,8 @@ public sealed class TheoryServices(
         IReadOnlyCollection<CheckingTimeDTO.AutoStudy> studyItems,
         Func<Task<StudyPlan>> refreshStudyPlan,
         Func<string, CancellationToken, Task> sendClientLog,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<ClientCurrentLesson?>? reportCurrentLesson = null)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(studyItems);
@@ -39,7 +41,6 @@ public sealed class TheoryServices(
         {
             cancellationToken.ThrowIfCancellationRequested();
             var savedThisPass = 0;
-
             foreach (var courseItems in pending.GroupBy(item => (CourseIid: item.iidRoot!.Value, ItemNtype: item.ntype!)))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -54,7 +55,6 @@ public sealed class TheoryServices(
                         && node.Iid > 0)
                     .GroupBy(node => node.Iid)
                     .ToDictionary(group => group.Key, group => group.First());
-
                 foreach (var plannedItem in courseItems)
                 {
 
@@ -74,6 +74,7 @@ public sealed class TheoryServices(
                     }
 
                     var current = node;
+                    using var activity = new CurrentStudyActivity(plannedItem, ClientRunSections.Theory, reportCurrentLesson);
                     while (current.ActualLearningTime < current.MinLearningTime)
                     {
                         cancellationToken.ThrowIfCancellationRequested();

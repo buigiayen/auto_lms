@@ -3,6 +3,17 @@ import { AppError, requireValue } from './errors.js';
 
 const uuid = value => typeof value === 'string' && /^[a-f\d]{8}(-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(value);
 const active = "state IN ('accepted','running','stopping')";
+function currentLesson(value) {
+  if (value === null) return null;
+  requireValue(value && typeof value === 'object' && !Array.isArray(value), 'currentLesson phải là object hoặc null.', 'currentLesson');
+  requireValue(['exam', 'review', 'theory', 'practical'].includes(value.section), 'Phần đang chạy không hợp lệ.', 'currentLesson.section');
+  for (const key of ['courseIid', 'itemIid'])
+    requireValue(Number.isInteger(value[key]) && value[key] > 0 && value[key] <= 2147483647, 'Mã bài phải là số nguyên dương 32 bit.', `currentLesson.${key}`);
+  for (const [key, max] of [['courseName', 1000], ['itemName', 1000], ['itemType', 50]])
+    requireValue(typeof value[key] === 'string' && value[key].trim().length > 0 && value[key].length <= max, `Thông tin bài phải dài 1–${max} ký tự.`, `currentLesson.${key}`);
+  return JSON.stringify({ section: value.section, courseIid: value.courseIid, courseName: value.courseName.trim(),
+    itemIid: value.itemIid, itemName: value.itemName.trim(), itemType: value.itemType.trim() });
+}
 export class WorkerQueue {
   constructor(store, { dailyResumeOffsetSeconds = () => randomInt(0, 8 * 3600 + 1) } = {}) {
     this.store = store; this.db = store.db;
@@ -21,7 +32,7 @@ export class WorkerQueue {
   reap() {
     const lost = this.db.prepare(`SELECT * FROM worker_runs WHERE ${active} AND lease_expires_at<=?`).all(this.now());
     for (const run of lost) {
-      const result = this.db.prepare(`UPDATE worker_runs SET state='lost',finished_at=? WHERE id=? AND ${active} AND lease_expires_at<=?`)
+      const result = this.db.prepare(`UPDATE worker_runs SET state='lost',finished_at=?,current_lesson_json=NULL WHERE id=? AND ${active} AND lease_expires_at<=?`)
         .run(this.now(), run.id, this.now());
       if (result.changes) this.event(run, 'warn', `Worker ${run.worker_name} mất heartbeat; account được phép nhận lại nếu vẫn đang Treo.`);
     }
@@ -38,6 +49,7 @@ export class WorkerQueue {
       : run?.state === 'deferred' ? 'stopped' : run?.state ?? 'stopped',
       runId: run?.id ?? null, workerName: run?.worker_name ?? null, lastHeartbeatAt: run?.last_heartbeat_at ?? null,
       leaseExpiresAt: isActive ? run.lease_expires_at : null,
+      currentLesson: isActive ? JSON.parse(run.current_lesson_json ?? 'null') : null,
       availableAfter: deferred ? account.available_after : null,
       deferReason: deferred ? JSON.parse(run?.finish_details_json ?? '{}').outcome === 'resting' ? 'scheduled_break' : 'daily_kpi' : null,
       lastLog: last ? { message: last.message, level: last.level, occurredAt: last.occurred_at } : null };
@@ -123,8 +135,9 @@ export class WorkerQueue {
       const run = this.verify(accountId, workerName, input);
       const data = this.controlData(run);
       const state = data.status === 'running' ? 'running' : 'stopping';
-      this.db.prepare('UPDATE worker_runs SET state=?,last_heartbeat_at=?,lease_expires_at=? WHERE id=?')
-        .run(state, this.now(), new Date(this.store.clock() + 30000).toISOString(), run.id);
+      const lesson = Object.hasOwn(input, 'currentLesson') ? currentLesson(input.currentLesson) : run.current_lesson_json;
+      this.db.prepare('UPDATE worker_runs SET state=?,last_heartbeat_at=?,lease_expires_at=?,current_lesson_json=? WHERE id=?')
+        .run(state, this.now(), new Date(this.store.clock() + 30000).toISOString(), lesson, run.id);
       return this.controlData(this.db.prepare('SELECT * FROM worker_runs WHERE id=?').get(run.id));
     });
   }
@@ -170,7 +183,7 @@ export class WorkerQueue {
             .run(this.now(), accountId);
         }
       }
-      this.db.prepare('UPDATE worker_runs SET state=?,finished_at=?,finish_details_json=? WHERE id=?')
+      this.db.prepare('UPDATE worker_runs SET state=?,finished_at=?,finish_details_json=?,current_lesson_json=NULL WHERE id=?')
         .run(state, finishedAt, JSON.stringify({ outcome: input.outcome, restSeconds, availableAfter }), run.id);
       const resumeText = availableAfter ? new Intl.DateTimeFormat('vi-VN', {
         timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'medium', hourCycle: 'h23'

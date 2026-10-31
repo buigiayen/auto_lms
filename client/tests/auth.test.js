@@ -48,7 +48,7 @@ test('anonymous visitors see login; every administrative route is protected', as
     assert.equal((await context.call('/api/health')).status, 200);
     assert.deepEqual((await context.call('/api/auth/session')).data, { authenticated: false, username: null });
     for (const [path, method] of [
-      ['/app.js', 'GET'], ['/api/accounts', 'GET'], ['/api/accounts', 'POST'],
+      ['/app.js', 'GET'], ['/api/config', 'GET'], ['/api/accounts', 'GET'], ['/api/accounts', 'POST'],
       ['/api/accounts/unknown', 'GET'], ['/api/accounts/unknown', 'PATCH'],
       ['/api/accounts/unknown/logs', 'GET'], ['/api/accounts/unknown/run', 'POST'],
       ['/api/accounts/unknown/lms/session', 'POST'], ['/api/proxies', 'GET'],

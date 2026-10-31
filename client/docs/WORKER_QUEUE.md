@@ -144,6 +144,34 @@ nghĩa là phải dừng công việc trước khi finish. `GET .../control` ch�
 gia hạn, nhận quyền sở hữu qua header X-Worker-Run-Id, X-Worker-Instance-Id và
 X-Worker-Lease-Token.
 
+Heartbeat có thể gửi thêm `currentLesson` để báo bài đang xử lý:
+
+```json
+{
+  "runId": "<run UUID>",
+  "instanceId": "<instance UUID>",
+  "leaseToken": "<token từ claim>",
+  "currentLesson": {
+    "section": "theory",
+    "courseIid": 110,
+    "courseName": "Pháp luật giao thông đường bộ",
+    "itemIid": 221,
+    "itemName": "Quy tắc giao thông",
+    "itemType": "video"
+  }
+}
+```
+
+`section` thuộc `exam`, `review`, `theory`, `practical`; hai IID là số nguyên
+dương 32 bit, tên bài dài 1–1000 ký tự và `itemType` dài 1–50 ký tự. Backend
+chỉ lưu các trường này sau khi xác thực quyền sở hữu lượt chạy. Gửi `null` để
+xóa bài hiện tại; bỏ trường này giữ trạng thái cũ để tương thích worker cũ.
+API account trả snapshot qua `execution.currentLesson`, gồm bài cha
+(`courseIid`, `courseName`) và bài con (`itemIid`, `itemName`, `itemType`).
+Snapshot được lưu qua restart, chỉ hiển thị khi lượt còn hoạt động và được xóa
+khi finish hoặc hết lease. Worker V2 báo bài ôn luyện/lý thuyết theo heartbeat;
+client hiển thị trên thẻ tài khoản và hồ sơ, cập nhật mỗi 5 giây.
+
 `POST /api/worker/accounts/:accountId/finish` nhận cùng ba trường sở hữu và
 `outcome: "completed" | "failed" | "stopped" | "deferred" | "resting"`. Backend nhả khóa,
 ghi log và với completed/failed/stopped thường chuyển account sang Dừng treo.
@@ -201,7 +229,7 @@ nốt log tối đa 5 phút với đúng token của run cũ; log cũ không tr�
 động của lượt mới. API đọc log trả thêm runId để truy vết.
 
 API account trả thêm execution gồm state, runId, workerName, lastHeartbeatAt,
-leaseExpiresAt và lastLog `{message,level,occurredAt}` của đúng lượt mới nhất.
+leaseExpiresAt, currentLesson và lastLog `{message,level,occurredAt}` của đúng lượt mới nhất.
 Bảng account và modal log tự cập nhật mỗi 5 giây. State hiển thị:
 
 | State | Giao diện |

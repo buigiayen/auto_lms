@@ -359,7 +359,8 @@ internal sealed class WorkerLane(
                     context.HasProxy,
                     (message, cancellationToken) => logs.SendAsync(context, "info", message, cancellationToken),
                     token,
-                    context.RunSections);
+                    context.RunSections,
+                    context.ReportCurrentLesson);
             }
             catch (LotusClientException error) when (BackendErrors.IsTemporary(error)
                 && context.RemainingLease > TimeSpan.FromSeconds(2))

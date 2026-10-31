@@ -11,6 +11,7 @@ const staticFiles = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']], ['/app.js', ['app.js', 'text/javascript; charset=utf-8']],
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
   ['/account-mood.js', ['account-mood.js', 'text/javascript; charset=utf-8']],
+  ['/account-identity.js', ['account-identity.js', 'text/javascript; charset=utf-8']],
   ['/login', ['login.html', 'text/html; charset=utf-8']],
   ['/login.js', ['login.js', 'text/javascript; charset=utf-8']]
 ]);
@@ -35,6 +36,7 @@ export function createApp({
   lmsOptions,
   proxyTester = testProxy,
   clock,
+  environment = process.env.NODE_ENV,
   workerRegistrationKey = process.env.WORKER_REGISTRATION_KEY,
   allowedHosts = (process.env.CLIENT_ALLOWED_HOSTS || '').split(','),
   // Embedding tests can supply null; the server entrypoint always requires auth.
@@ -47,7 +49,7 @@ export function createApp({
   if (workerRegistrationKey && workerRegistrationKey.length < 32)
     throw new Error('WORKER_REGISTRATION_KEY phải có ít nhất 32 ký tự.');
   const auth = adminAuth === null ? null : new AdminAuth({ ...adminAuth, clock: clock || Date.now });
-  const store = new Store(directory, { clock }), lms = new LmsService(store, lmsOptions);
+  const store = new Store(directory, { clock, environment }), lms = new LmsService(store, lmsOptions);
   const acceptedHosts = new Set(['localhost', '127.0.0.1', '[::1]', process.env.CLIENT_HOST,
     ...allowedHosts.map(host => host.trim()).filter(Boolean)]);
   const server = createServer(async (req, res) => {
@@ -132,6 +134,7 @@ export function createApp({
       const workerAccountRead = method === 'GET' && /^\/api\/accounts\/[^/]+$/.test(path) && req.headers.authorization;
       const workerProxyRead = method === 'GET' && /^\/api\/proxies\/[^/]+$/.test(path) && req.headers.authorization;
       if (!workerAccountRead && !workerProxyRead) auth?.requireSession(req);
+      if (path === '/api/config' && method === 'GET') { send(200, { data: { allowTextUsernames: store.allowTextUsernames } }); return; }
       if (path === '/api/accounts' && method === 'GET') { send(200, store.listAccounts(uri.searchParams, pageParams(uri.searchParams))); return; }
       if (path === '/api/accounts' && method === 'POST') { send(201, { data: store.saveAccount(await readJson(req)) }); return; }
       if (path === '/api/logs' && method === 'GET') { send(200, store.logs(null, uri.searchParams, pageParams(uri.searchParams, 50))); return; }

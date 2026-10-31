@@ -49,6 +49,10 @@ internal static class RunSectionChecks
                 $"the {section} selection includes only its matching study type");
             check((fake.TheoryReads > 0) == (section == ClientRunSections.Theory),
                 $"the {section} selection does not load excluded theory details");
+            if (section is ClientRunSections.Theory or ClientRunSections.Review)
+                check(plan.Items[0].courseName == "Theory and review"
+                    && plan.Items[0].name == (section == ClientRunSections.Theory ? "Theory video" : "Review"),
+                    "study planning keeps the parent course and child lesson names separately");
         }
 
         foreach (var sections in new IReadOnlyList<string>[]
@@ -67,12 +71,22 @@ internal static class RunSectionChecks
                 new ProxyIpChecker(new AccountWebProxyProvider()));
             fake.Session = session;
             var logs = new List<string>();
+            var lessons = new List<ClientCurrentLesson?>();
             var result = await runner.Runner(new LotusLmsLoginRequest { Username = "fixture", Password = "fixture" },
-                99, false, (message, _) => { logs.Add(message); return Task.CompletedTask; }, default, sections);
+                99, false, (message, _) => { logs.Add(message); return Task.CompletedTask; }, default, sections, lessons.Add);
             check(fake.TheorySaves == (sections.Contains("theory") ? 1 : 0)
                 && fake.ReviewSaves == (sections.Contains("review") ? 1 : 0),
                 $"Runner preserves the {string.Join(',', sections)} filter through all progress refreshes");
             var executable = sections.Contains("theory") || sections.Contains("review");
+            var selectedLessons = lessons.OfType<ClientCurrentLesson>().ToList();
+            check(selectedLessons.Count == sections.Count(section => section is "theory" or "review")
+                && selectedLessons.All(lesson => lesson.CourseIid == 99 && lesson.CourseName == "Theory and review"),
+                "runner reports the correct parent for each selected lesson");
+            check(selectedLessons.All(lesson => lesson.Section == "theory"
+                    ? lesson.ItemIid == 44 && lesson.ItemName == "Theory video" && lesson.ItemType == "video"
+                    : lesson.ItemIid == 100 && lesson.ItemName == "Review" && lesson.ItemType == "practice")
+                && lessons.Last() is null,
+                "theory and review report their child IDs, names and types, then clear the current lesson");
             check(result == (executable ? AccountStudyResult.SelectedSectionsCompleted : AccountStudyResult.Pending),
                 "finishing selected parts does not report the entire enrolment plan completed");
             if (!executable)

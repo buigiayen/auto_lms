@@ -48,6 +48,24 @@ const validIid = (value) =>
 // The KPI is user/day-scoped, but the upstream request requires a learning-page referer.
 const dailyKpiRefererCourseIid = 110;
 
+function courseIids(items) {
+  const result = new Set();
+  function visit(nodes) {
+    for (const node of nodes) {
+      const children = [node?.children, node?.course?.children]
+        .find(value => Array.isArray(value) && value.length > 0);
+      if (children) { visit(children); continue; }
+      const course = node?.course ?? (node?.__expand || node?._expand || node?.ntype === 'course' ? node : null);
+      const value = course?.iid;
+      const iid = typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value.trim()))
+        ? Number(value) : Number.NaN;
+      if (validIid(iid)) result.add(iid);
+    }
+  }
+  visit(items);
+  return result;
+}
+
 export function proxyAgent(proxy) {
   if (!proxy.enabled) return undefined;
   if (new URL(proxy.address).protocol === "socks5:") {
@@ -183,7 +201,7 @@ export class LmsService {
     clearInterval(this.cleanup);
   }
 
-  async request(session, path, fields, query, referer, authenticated = true) {
+  async request(session, path, fields, query, referer, authenticated = true, signal) {
     const uri = new URL(
       path,
       session.config.base.endsWith("/")
@@ -199,7 +217,7 @@ export class LmsService {
         body,
         dispatcher: session.dispatcher,
         redirect: "manual",
-        signal: AbortSignal.timeout(30000),
+        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000),
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
           Accept: "application/json, text/plain, */*",
@@ -212,6 +230,7 @@ export class LmsService {
       session.jar.update(response.headers, uri);
       raw = await response.json();
     } catch (error) {
+      if (signal?.aborted) throw error;
       const timeout = ["TimeoutError", "AbortError"].includes(error.name);
       throw new AppError(
         timeout ? 504 : 502,
@@ -507,7 +526,8 @@ export class LmsService {
     return { totalGainedKpiTimeInSeconds, maxGainedKpiTimeInSeconds };
   }
 
-  async courses(accountId, id, planId, paging) {
+  async courses(accountId, id, planId, paging, { signal, fresh = false } = {}) {
+    signal?.throwIfAborted();
     requireValue(
       Number.isInteger(planId) && planId > 0,
       "Mã chương trình không hợp lệ.",
@@ -522,6 +542,7 @@ export class LmsService {
     const referer = `${s.config.origin}/student/ep/${planId}`;
     const query = new URLSearchParams({
       ...this.context(s),
+      ...(fresh ? { allow_cache_api_cdn: '0' } : {}),
       _sand_get_total: "0",
       enrolment_plan_iid: String(planId),
       items_per_page: String(paging.pageSize),
@@ -542,6 +563,8 @@ export class LmsService {
       },
       query,
       referer,
+      true,
+      signal,
     );
     if (!Array.isArray(raw.result))
       throw new AppError(
@@ -559,5 +582,30 @@ export class LmsService {
         Array.isArray(raw.result) && raw.result.length === paging.pageSize,
       rawResponse: raw,
     };
+  }
+
+  async recalculateCourses(accountId, id, planId, paging, signal) {
+    const session = this.getSession(accountId, id);
+    requireValue(session.purpose === 'details', 'Chỉ tính lại điểm trong phiên xem chi tiết tài khoản.');
+    const initial = await this.courses(accountId, id, planId, paging, { signal, fresh: true });
+    for (const iid of courseIids(initial.rawResponse.result)) {
+      signal?.throwIfAborted();
+      const s = this.getSession(accountId, id);
+      const webUrl = `${s.config.origin}/student/courses/${iid}`;
+      const raw = await this.request(s, 'rubrik/api/get-user-score-by-rubric', {
+        ...this.identity(s),
+        _sand_domain: s.config.tenant,
+        _sand_web_url: webUrl,
+        _sand_device_uuid: s.deviceUuid,
+        _sand_session_id: s.browserSession,
+        _sand_user_agent: userAgent,
+      }, {
+        ...this.context(s), iid: String(iid), ntype: 'course', recalculate: '1', allow_cache_api_cdn: '0',
+      }, webUrl, true, signal);
+      if (!raw.result || typeof raw.result !== 'object' || Array.isArray(raw.result)
+          || ![0, 1, '0', '1', false, true].includes(raw.result.passed))
+        throw new AppError(502, 'LMS_REQUEST_FAILED', 'LMS không xác nhận kết quả tính lại điểm rubric.');
+    }
+    return this.courses(accountId, id, planId, paging, { signal, fresh: true });
   }
 }

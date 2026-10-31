@@ -231,6 +231,20 @@ export function createApp({
         if (action === '/enrolment-plans' && method === 'GET') { send(200, await lms.plans(id, sessionId, pageParams(uri.searchParams, 12, 200))); return; }
         const courses = action.match(/^\/enrolment-plans\/(\d+)\/courses$/);
         if (courses && method === 'GET') { send(200, { data: await lms.courses(id, sessionId, Number(courses[1]), pageParams(uri.searchParams, 20, 200)) }); return; }
+        const recalculate = action.match(/^\/enrolment-plans\/(\d+)\/recalculate-courses$/);
+        if (recalculate && method === 'POST') {
+          const controller = new AbortController();
+          const cancel = () => controller.abort();
+          res.once('close', cancel);
+          try {
+            const data = await lms.recalculateCourses(id, sessionId, Number(recalculate[1]),
+              pageParams(uri.searchParams, 20, 200), controller.signal);
+            if (!res.destroyed) send(200, { data });
+          } catch (error) {
+            if (!controller.signal.aborted || !res.destroyed) throw error;
+          } finally { res.off('close', cancel); }
+          return;
+        }
       }
       throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy đường dẫn.');
     } catch (error) {

@@ -139,8 +139,11 @@ logger và bổ sung một logger gửi sự kiện về client.
 6. Hiển thị danh sách chương trình học trong dropdown, gồm tên và `iid`.
 7. Người dùng chọn một chương trình. Backend dùng `iid` đã chọn làm
    `enrolment_plan_iid` để gọi `get-student-courses-in-enrolment-plan-table-view`.
-8. Modal hiển thị bảng tiến độ: mỗi phần tử `result` là một cột theo `name`,
-   các tiêu chí `score_by_rubrik[].name` là các hàng, giá trị là `score / max_score`.
+8. Backend lấy course của các bài đang hiển thị, gọi
+   `rubrik/api/get-user-score-by-rubric` với `recalculate=1` cho từng IID duy
+   nhất, gồm cả bài con. Sau đó đọc lại danh sách course một lần và mới trả bảng.
+   Mỗi bài là một cột theo `name`, tiêu chí `score_by_rubrik[].name` là các hàng,
+   giá trị là `score / max_score`.
 9. Bấm “Kiểm tra KPI 1 ngày” để đọc KPI theo ngày của tài khoản và hiển thị
    `totalGainedKpiTimeInSeconds / maxGainedKpiTimeInSeconds` (giây).
    Nút có thể dùng ngay sau khi đăng nhập, không cần chọn chương trình học.
@@ -172,10 +175,16 @@ sequenceDiagram
     API-->>UI: totalGained / maxGained
     UI-->>User: Hiển thị KPI trong ngày
     User->>UI: Chọn enrolmentPlanIid
-    UI->>API: GET /accounts/:id/enrolment-plans/:iid/courses
+    UI->>API: POST /accounts/:id/enrolment-plans/:iid/recalculate-courses
     API->>LMS: POST /student/api/get-student-courses-in-enrolment-plan-table-view
-    LMS-->>API: Object JSON gốc
-    API-->>UI: rawResponse
+    LMS-->>API: Course và bài con của trang đã chọn
+    loop Mỗi course.iid duy nhất
+        API->>LMS: POST /rubrik/api/get-user-score-by-rubric?iid=courseIid&ntype=course&recalculate=1
+        LMS-->>API: Điểm rubric đã tính lại
+    end
+    API->>LMS: Đọc lại đúng trang danh sách course
+    LMS-->>API: Object JSON cập nhật
+    API-->>UI: rawResponse của lần đọc cuối
     UI-->>User: Bảng điểm theo bài học và tiêu chí
 ```
 
@@ -203,6 +212,10 @@ sequenceDiagram
   trường đánh giá. Mọi nhãn từ LMS đều được escape trước khi hiển thị.
 - Chọn chương trình mới phải xóa kết quả cũ và hiện trạng thái tải. Nếu người
   dùng chọn liên tiếp, chỉ response của lựa chọn cuối được hiển thị.
+- Mỗi lần chọn chương trình hoặc đổi trang đều tính lại rubric trước khi hiển
+  thị. Lỗi ở bước đọc/tính lại/tải lại không được trả bảng cũ thành kết quả mới.
+- Hủy request khi đóng modal/đổi lựa chọn sẽ hủy cuộc gọi LMS đang chờ và ngừng
+  các bước còn lại. Mỗi bước xác thực lại phiên và proxy trước khi tiếp tục.
 - Khi lỗi, xóa bảng cũ để không nhầm với kết quả vừa yêu cầu.
 - Đóng modal hủy các request frontend còn chờ và yêu cầu backend xóa phiên local.
 

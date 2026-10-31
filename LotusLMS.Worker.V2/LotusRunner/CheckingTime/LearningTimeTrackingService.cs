@@ -32,7 +32,6 @@ public sealed class LearningTimeTrackingService(
             logger.LogInformation("{Message}", fullKpiMessage);
             await sendClientLog(fullKpiMessage, token);
         }
-
         return todayKpiTime.TodayGainedKpiTime.Full;
     }
     public async Task<StudyPlan> IdeaAutoStudy(
@@ -68,6 +67,13 @@ public sealed class LearningTimeTrackingService(
         var practiceNotPass = FillterCourse(leafStudy, "Ôn luyện");
         foreach (var item in practiceNotPass)
         {
+            if (await ReCalculateCourse(lotusLmsSession, item.Iid, token))
+            {
+                var message = $"Loại bỏ bài ${item.Name} do đã hoàn thành!";
+                logger.LogInformation("{Message}", message);
+                await sendClientLog(message, token);
+                continue;
+            }
             var practice = item.__Expand?.Syllabus?.children?.FirstOrDefault(c => c?.ntype == "practice");
             CheckingTimeDTO.AutoStudy autoStudy = new CheckingTimeDTO.AutoStudy();
             autoStudy.name = practice?.name ?? item.Name;
@@ -88,6 +94,13 @@ public sealed class LearningTimeTrackingService(
             ? FillterCourse(leafStudy, "Xem giáo trình") : [];
         foreach (var item in TheoryIsNotPass)
         {
+            if (await ReCalculateCourse(lotusLmsSession, item.Iid, token))
+            {
+                var message = $"Loại bỏ bài ${item.Name} do đã hoàn thành!";
+                logger.LogInformation("{Message}", message);
+                await sendClientLog(message, token);
+                continue;
+            }
             var theoryItems = await client.GetDetailLearningTimeAsync(
                 lotusLmsSession,
                 item.Iid,
@@ -96,7 +109,7 @@ public sealed class LearningTimeTrackingService(
                         .Where(p => string.Equals(p.Ntype, "video", StringComparison.OrdinalIgnoreCase)
                             && !p.IsSuccessLearningTime);
 
-                            
+
             foreach (var i in filter)
             {
                 CheckingTimeDTO.AutoStudy autoStudy = new CheckingTimeDTO.AutoStudy();
@@ -115,6 +128,13 @@ public sealed class LearningTimeTrackingService(
             ? FillterCourse(leafStudy, "Kiểm tra") : [];
         foreach (var item in exam)
         {
+            if (await ReCalculateCourse(lotusLmsSession, item.Iid, token))
+            {
+                var message = $"Loại bỏ bài ${item.Name} do đã hoàn thành!";
+                logger.LogInformation("{Message}", message);
+                await sendClientLog(message, token);
+                continue;
+            }
             CheckingTimeDTO.AutoStudy autoStudy = new CheckingTimeDTO.AutoStudy();
             autoStudy.name = item.Name;
             autoStudy.iid = item.Iid;
@@ -143,6 +163,16 @@ public sealed class LearningTimeTrackingService(
         await sendClientLog(NotiMessage, token);
         return new StudyPlan(autoStudies, IsCompleted: false);
     }
+
+    public async Task<bool> ReCalculateCourse(LotusLmsSession lotusLmsSession, int courseID, CancellationToken token)
+    {
+        var data = await client.getUserScoreRubric(lotusLmsSession, courseID, token);
+        var message = $"Fx1: {data.Passed}!";
+        logger.LogInformation("{Message}", message);
+        return data.Passed == 1;
+    }
+
+
 
     private static IEnumerable<Student_course_in_enrolment_plan_view> GetLeafStudyItems(
         IEnumerable<Student_course_in_enrolment_plan_view> items)

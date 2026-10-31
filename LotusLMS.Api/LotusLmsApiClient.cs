@@ -201,7 +201,33 @@ public sealed class LotusLmsApiClient(
             session,
             cancellationToken);
     }
+    public async Task<get_user_score_by_rubric> getUserScoreRubric(
+       LotusLmsSession session,
+       int courseIid,
+       CancellationToken cancellationToken = default)
+    {
+        ValidateSession(session);
+        EnsurePositive(courseIid, nameof(courseIid));
 
+        var query = new List<KeyValuePair<string, string>>
+        {
+            Pair("iid", Format(courseIid)),
+            Pair("recalculate", Format(1)),
+            Pair("ntype", "course"),
+        };
+        query.AddRange(BuildBrowserQuery(session));
+
+        var endpoint = BuildRelativeUri("rubrik/api/get-user-score-by-rubric", query);
+        var webUrl = BuildWebUrl($"student/courses/{courseIid}", session.Provider);
+
+        var data = await _transport.PostAsync<BaseApi<get_user_score_by_rubric>>(
+            endpoint,
+            BuildAuthenticatedForm(session, webUrl),
+            webUrl,
+            session,
+            cancellationToken);
+        return data.Result;
+    }
     public async Task<BaseApi<ResultDetailLearningTime>> GetDetailLearningTimeAsync(
         LotusLmsSession session,
         int courseIid,

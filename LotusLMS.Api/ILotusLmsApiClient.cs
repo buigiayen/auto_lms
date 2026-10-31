@@ -101,4 +101,9 @@ public interface ILotusLmsApiClient
         string? requestId = null,
         string? requestToken = null,
         CancellationToken cancellationToken = default);
+
+    Task<get_user_score_by_rubric> getUserScoreRubric(
+      LotusLmsSession session,
+      int courseIid,
+      CancellationToken cancellationToken = default);
 }

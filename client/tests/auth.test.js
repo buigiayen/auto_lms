@@ -52,6 +52,7 @@ test('anonymous visitors see login; every administrative route is protected', as
       ['/api/accounts/unknown', 'GET'], ['/api/accounts/unknown', 'PATCH'],
       ['/api/accounts/unknown/logs', 'GET'], ['/api/accounts/unknown/run', 'POST'],
       ['/api/accounts/unknown/lms/session', 'POST'], ['/api/proxies', 'GET'],
+      ['/api/accounts/unknown/enrolment-plans/99/recalculate-courses', 'POST'],
       ['/api/proxies', 'POST'], ['/api/proxies/unknown', 'GET'], ['/api/proxies/unknown', 'DELETE'],
       ['/api/proxies/test', 'POST'], ['/api/logs', 'GET'],
     ]) {

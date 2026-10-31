@@ -839,11 +839,11 @@ async function details(account) {
         "Chọn một chương trình để xem tiến độ học tập.";
       return;
     }
-    $("#course-progress-placeholder").innerHTML = spinner("Đang đọc tiến độ học tập…");
+    $("#course-progress-placeholder").innerHTML = spinner("Đang tính lại điểm và tải tiến độ học tập…");
     try {
       const result = await api(
-        `/api/accounts/${account.id}/enrolment-plans/${id}/courses?page=${modal.coursePage}&pageSize=20`,
-        { sessionId: modal.sessionId, signal: modal.controller.signal },
+        `/api/accounts/${account.id}/enrolment-plans/${id}/recalculate-courses?page=${modal.coursePage}&pageSize=20`,
+        { method: "POST", sessionId: modal.sessionId, signal: modal.controller.signal },
       );
       if (!current() || modal.request !== request) return;
       $("#course-progress").innerHTML = renderCourseProgress(result.data.rawResponse);

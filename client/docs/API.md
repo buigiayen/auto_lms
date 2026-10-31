@@ -116,6 +116,7 @@ LMS với `success=false` vẫn là lỗi nghiệp vụ. Ưu tiên đọc `messa
 | GET | `/api/accounts/:accountId/today-gained-kpi-time` | Kiểm tra KPI học tập trong ngày |
 | GET | `/api/accounts/:accountId/enrolment-plans` | Đọc danh sách chương trình học |
 | GET | `/api/accounts/:accountId/enrolment-plans/:enrolmentPlanIid/courses` | Đọc response khóa học raw |
+| POST | `/api/accounts/:accountId/enrolment-plans/:enrolmentPlanIid/recalculate-courses` | Đọc course, tính lại rubric rồi đọc lại để hiển thị bảng |
 | DELETE | `/api/accounts/:accountId/lms/session` | Đóng phiên xem chi tiết |
 | GET | `/api/proxies` | Danh sách cấu hình proxy, không trả mật khẩu |
 | POST | `/api/proxies` | Tạo cấu hình proxy |
@@ -375,6 +376,26 @@ Sau khi chọn `99`:
 
 `GET /api/accounts/:accountId/enrolment-plans/99/courses?page=1&pageSize=20`
 
+Modal dùng `POST /api/accounts/:accountId/enrolment-plans/99/recalculate-courses?page=1&pageSize=20`
+với cùng `X-Lms-Session-Id`, không cần body. Endpoint này chỉ dành cho phiên
+xem chi tiết và thực hiện tuần tự:
+
+1. Đọc danh sách khóa học của trang đã chọn.
+2. Duyệt các bài con đang tạo cột trong bảng, lấy `course.iid` hợp lệ và bỏ
+   IID trùng. Mỗi course được gọi một lần qua LMS
+   `POST rubrik/api/get-user-score-by-rubric?iid=<courseIid>&ntype=course&recalculate=1`.
+3. Sau khi tất cả lần tính điểm thành công, đọc lại đúng trang khóa học một
+   lần và trả response có cùng cấu trúc như GET bên dưới. UI chỉ hiển thị dữ
+   liệu của lần đọc cuối này. GET vẫn chỉ đọc, không kích hoạt tính lại điểm.
+
+Các request dùng cùng token/cookie, thiết bị, tenant và proxy của phiên. Chỉ
+lấy IID từ danh sách LMS, không nhận danh sách course từ frontend. `result.iid`
+trong response rubric là IID rubric, không dùng thay `course.iid`. Node nhóm
+không có course hợp lệ được bỏ qua; node có bài con dùng course của bài con.
+Nếu tính điểm lỗi hoặc response không xác nhận trạng thái `passed`, endpoint
+trả lỗi thay vì hiển thị dữ liệu cũ. Đóng modal/đổi lựa chọn hủy request và
+ngừng các bước còn lại. Phiên bị thay thế hoặc proxy thay đổi cũng dừng luồng.
+
 Backend kiểm tra `enrolmentPlanIid` thuộc danh sách chương trình đã đọc trong
 phiên này trước khi gọi LMS. Nếu chưa được đọc hoặc không thuộc tài khoản, trả
 `403 ENROLMENT_PLAN_NOT_AVAILABLE`. Cho phép phân trang response khóa học, mỗi
@@ -499,7 +520,27 @@ Node.js adapter phải đọc body JSON gốc để phục vụ modal. Hàm C# h
 `GetStudentCoursesAsync` trả `data.Result` qua DTO nên không phải là response
 raw đầy đủ để dùng trực tiếp cho yêu cầu này.
 
-### 9.5. Ký request và xử lý lỗi
+### 9.5. Tính lại điểm rubric
+
+`POST {apiBaseUrl}/rubrik/api/get-user-score-by-rubric`, form
+`application/x-www-form-urlencoded`. Query gồm `iid=<course.iid>`, `ntype=course`,
+`recalculate=1`, browser context và `allow_cache_api_cdn=0`. Form dùng thông tin
+xác thực, thiết bị, browser session và `_sand_web_url` của cùng phiên đang xem;
+`Origin` là origin nhà cung cấp, `Referer` là `{webOrigin}/student/courses/<courseIid>`.
+
+Response theo mẫu được cung cấp có `success=true`, `result.passed`, `result.score`,
+`result.cp`, `result.rubric` và `result.score_by_rubrik`. `result.iid` là rubric
+được course sử dụng, có thể khác IID course trong query. Backend kiểm tra
+response có object `result` và trạng thái `passed` hợp lệ, rồi tải lại course;
+không ghép response từng rubric trực tiếp vào bảng. Hai lần đọc course của luồng
+này cũng gửi `allow_cache_api_cdn=0` để yêu cầu upstream bỏ cache API.
+
+Hợp đồng request được đối chiếu với `LotusLmsApiClient.getUserScoreRubric`;
+response đối chiếu mẫu người dùng cung cấp. Kiểm thử bằng LMS giả trên HTTP
+localhost xác nhận thứ tự request, cookie/chữ ký/tenant và phản hồi lỗi; chưa
+xác minh bằng tài khoản LMS thật.
+
+### 9.6. Ký request và xử lý lỗi
 
 Port phần ký bằng Node.js crypto theo
 [tài liệu thư viện hiện có](../../LotusLMS.RequestSigning/README.md), đối chiếu

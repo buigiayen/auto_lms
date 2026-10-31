@@ -64,7 +64,7 @@ hiện tại của repository. Proxy được nhập và lưu trên trang “C�
 | Sửa thông tin | Cập nhật tài khoản; để trống mật khẩu trên form sửa sẽ giữ mật khẩu cũ |
 | Thay đổi trạng thái | Chuyển giữa “Treo” và “Dừng treo” |
 | Nhận log worker | Worker gửi log về backend, SQLite lưu theo tài khoản |
-| Xem chi tiết tài khoản | Đăng nhập LMS, chọn chương trình học, hiển thị response danh sách khóa học dạng JSON trong modal |
+| Xem chi tiết tài khoản | Đăng nhập LMS, chọn chương trình học, xem bảng điểm theo bài và tiêu chí; màu xanh khi đạt, đỏ khi chưa đạt |
 | Cấu hình proxy | Lưu nhiều proxy HTTP/HTTPS/SOCKS5, kiểm tra IP và chọn một cấu hình cho từng account |
 | Bảng quản lý account | Tìm kiếm, lọc, phân trang; tạo, sửa, chọn proxy, đổi trạng thái, mở chi tiết và xem log |
 

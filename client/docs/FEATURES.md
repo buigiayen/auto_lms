@@ -139,7 +139,8 @@ logger và bổ sung một logger gửi sự kiện về client.
 6. Hiển thị danh sách chương trình học trong dropdown, gồm tên và `iid`.
 7. Người dùng chọn một chương trình. Backend dùng `iid` đã chọn làm
    `enrolment_plan_iid` để gọi `get-student-courses-in-enrolment-plan-table-view`.
-8. Modal hiển thị nguyên object JSON phản hồi trong vùng xem raw.
+8. Modal hiển thị bảng tiến độ: mỗi phần tử `result` là một cột theo `name`,
+   các tiêu chí `score_by_rubrik[].name` là các hàng, giá trị là `score / max_score`.
 9. Bấm “Kiểm tra KPI 1 ngày” để đọc KPI theo ngày của tài khoản và hiển thị
    `totalGainedKpiTimeInSeconds / maxGainedKpiTimeInSeconds` (giây).
    Nút có thể dùng ngay sau khi đăng nhập, không cần chọn chương trình học.
@@ -175,7 +176,7 @@ sequenceDiagram
     API->>LMS: POST /student/api/get-student-courses-in-enrolment-plan-table-view
     LMS-->>API: Object JSON gốc
     API-->>UI: rawResponse
-    UI-->>User: JSON được định dạng trong modal
+    UI-->>User: Bảng điểm theo bài học và tiêu chí
 ```
 
 ### 7.2. Yêu cầu modal
@@ -184,13 +185,25 @@ sequenceDiagram
 - Có nút kiểm tra KPI trong ngày; kết quả hiển thị theo dạng `đã đạt / tối đa`.
 - Dropdown “Chương trình học”, có trạng thái tải, không có dữ liệu và phân trang
   nếu response có nhiều trang. Không tự chọn phần tử đầu để thay người dùng.
-- Vùng JSON có cuộn, định dạng bằng `JSON.stringify(rawResponse, null, 2)` và
-  nút “Sao chép JSON”. Render dưới dạng văn bản, không diễn giải thành HTML.
-- Giữ nguyên các phần tử cha `course=null`, `children`, `__expand`, các trường
-  chưa có DTO và các giá trị `null` trong response raw.
+- Bảng tiến độ thay vùng JSON và nút sao chép. Cột lấy từ `result[].name`, hàng
+  ghép theo tên trong `course.__expand.score_by_rubric.score_by_rubrik`.
+- Node có `children` hoặc `course.children` không rỗng được thay bằng các bài
+  con, xử lý đệ quy. Tiêu đề nhóm nằm trên các cột con; nhóm lồng nhau giữ đủ
+  đường dẫn tên. Điểm lấy từ course của từng bài con, không lấy điểm node cha.
+- Ô hiển thị `score / max_score`, xanh khi `passed=1`, đỏ khi chưa đạt. Thiếu
+  tiêu chí, điểm hoặc điểm tối đa thì ô để trống; giữ nguyên điểm 0 và điểm lẻ.
+- Ưu tiên `score_by_rubric.passed=1` của cả bài: tô xanh tiêu đề và toàn bộ cột,
+  kể cả ô trống; bỏ qua trạng thái `passed` riêng của từng tiêu chí. Các giá trị
+  điểm vẫn lấy nguyên từ LMS. Cột bài con dùng trạng thái của chính bài con.
+- Phần tử không có course và không có bài con vẫn giữ cột tiêu đề, các ô trống.
+  Tiêu đề nhóm/bài và cột đầu cố định trong vùng cuộn của bảng.
+- Modal chi tiết rộng 99% và cao 99% viewport; vùng bảng chiếm không gian còn
+  lại, cuộn bên trong. Các modal khác giữ kích thước hiện tại.
+- Backend giữ nguyên toàn bộ response raw, frontend chỉ dựng bảng từ các
+  trường đánh giá. Mọi nhãn từ LMS đều được escape trước khi hiển thị.
 - Chọn chương trình mới phải xóa kết quả cũ và hiện trạng thái tải. Nếu người
   dùng chọn liên tiếp, chỉ response của lựa chọn cuối được hiển thị.
-- Khi lỗi, xóa dữ liệu raw cũ để không nhầm với kết quả vừa yêu cầu.
+- Khi lỗi, xóa bảng cũ để không nhầm với kết quả vừa yêu cầu.
 - Đóng modal hủy các request frontend còn chờ và yêu cầu backend xóa phiên local.
 
 ### 7.3. Phiên đăng nhập và lỗi
@@ -223,9 +236,9 @@ người dùng dừng treo trước khi đăng nhập lại, không tự thay đ
 | Đăng nhập LMS thành công | Dropdown chương trình học có dữ liệu từ API |
 | Kiểm tra KPI trong ngày | Gọi đúng API có phiên hợp lệ và hiển thị `đã đạt / tối đa` theo giây |
 | Không có chương trình học | Modal hiển thị trạng thái trống |
-| Chọn chương trình | Backend gửi đúng `enrolment_plan_iid`, modal hiển thị response raw |
-| Response có `course=null` và `children` | JSON giữ nguyên cấu trúc, không phát sinh lỗi null |
-| Đăng nhập sai hoặc token hết hạn | Hiện lỗi và `upstreamCode` nếu có; không hiển thị JSON cũ |
+| Chọn chương trình | Backend gửi đúng `enrolment_plan_iid`, modal hiển thị bảng tiến độ học tập |
+| Response có `course=null` và `children` | Hiển thị các cột bài con cùng tiêu đề nhóm, đọc điểm của từng bài con |
+| Đăng nhập sai hoặc token hết hạn | Hiện lỗi và `upstreamCode` nếu có; không hiển thị bảng cũ |
 | Đổi nhà cung cấp | Request tiếp theo dùng đúng tenant/origin mới |
 | Khởi động lại client | Tài khoản, trạng thái, GUID và log vẫn còn; phiên LMS cần đăng nhập lại |
 
@@ -309,7 +322,7 @@ chọn cũ nếu còn trong danh sách. Bước Run không có phần chọn kh�
 Hỗ trợ tải thêm chương trình. Hủy không lưu. Đổi proxy xóa danh sách đang xem
 và yêu cầu tải lại qua proxy mới. Lỗi đăng nhập, danh sách trống, proxy hết hạn
 và phiên hết hạn không đưa account vào hàng chờ. Modal xem chi tiết vẫn hỗ trợ
-xem JSON danh sách khóa học như trước.
+xem bảng tiến độ danh sách khóa học.
 
 Worker nhận enrolmentPlanIid, enrolmentPlanName trong API danh sách và claim,
 heartbeat/control. DTO C# có EnrolmentPlanIid và EnrolmentPlanName; bỏ CourseIid

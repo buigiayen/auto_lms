@@ -12,6 +12,7 @@ const staticFiles = new Map([
   ['/styles.css', ['styles.css', 'text/css; charset=utf-8']],
   ['/account-mood.js', ['account-mood.js', 'text/javascript; charset=utf-8']],
   ['/account-identity.js', ['account-identity.js', 'text/javascript; charset=utf-8']],
+  ['/course-progress.js', ['course-progress.js', 'text/javascript; charset=utf-8']],
   ['/login', ['login.html', 'text/html; charset=utf-8']],
   ['/login.js', ['login.js', 'text/javascript; charset=utf-8']]
 ]);

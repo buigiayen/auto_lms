@@ -1,5 +1,6 @@
 import { accountMood } from "./account-mood.js";
 import { accountIdentityPolicy } from "./account-identity.js";
+import { renderCourseProgress } from "./course-progress.js";
 
 const $ = (selector) => document.querySelector(selector);
 const icon = (name) => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
@@ -346,10 +347,10 @@ function closeDialog() {
     }).catch(() => {});
   if ($("#dialog").open) $("#dialog").close();
 }
-function openDialog(title, subtitle, body, { wide = false, footer = "" } = {}) {
+function openDialog(title, subtitle, body, { wide = false, viewport = false, footer = "" } = {}) {
   closeDialog();
   const dialog = $("#dialog");
-  dialog.className = wide ? "wide" : "";
+  dialog.className = viewport ? "viewport" : wide ? "wide" : "";
   dialog.innerHTML = `<div class="dialog-heading"><div><h2 id="dialog-title">${escape(title)}</h2><p>${escape(subtitle)}</p></div><button class="icon-button" data-close aria-label="Đóng">${icon("close")}</button></div>${body}${footer}`;
   dialog.showModal();
   return state.modalEpoch;
@@ -752,8 +753,8 @@ async function details(account) {
   const epoch = openDialog(
     "Chi tiết tài khoản",
     `${account.identityNumber} · ${providerName(account.provider)}`,
-    `<div class="dialog-body">${account.status === "running" ? '<div class="status-notice">Tài khoản đang ở trạng thái Treo. Đăng nhập xem chi tiết có thể ảnh hưởng phiên của worker.</div>' : ""}<div id="detail-status">${spinner("Đang đăng nhập vào LMS…")}</div><div id="detail-content" hidden><section class="run-plan-panel"><div class="run-plan-heading"><div><h3>KPI hôm nay (giây)</h3><p class="run-plan-summary" id="daily-kpi-result" role="status" aria-live="polite">Chưa kiểm tra.</p></div><button type="button" class="button small" id="check-daily-kpi">${icon("refresh")}Kiểm tra KPI 1 ngày</button></div></section><div class="plan-toolbar"><label>Chương trình học<select id="plan-select"><option value="">Chọn chương trình học…</option></select></label><button class="button" id="more-plans" hidden>Tải thêm chương trình</button></div><div class="json-heading"><strong>RESPONSE · JSON</strong><button class="button small" id="copy-json" disabled>${icon("copy")}Sao chép</button></div><div id="json-placeholder" class="json-placeholder">Chọn một chương trình để xem phản hồi danh sách khóa học.</div><pre id="raw-json" class="raw-json" hidden></pre><div class="pagination modal-pagination" id="course-pagination" hidden><span id="course-page">Trang 1</span><div><button class="button small" id="course-prev">← Trang trước</button><button class="button small" id="course-next">Trang sau →</button></div></div></div><div id="detail-error" class="inline-error" role="alert" hidden></div><button class="button" id="retry-login" hidden>Đăng nhập lại</button></div>`,
-    { wide: true },
+    `<div class="dialog-body">${account.status === "running" ? '<div class="status-notice">Tài khoản đang ở trạng thái Treo. Đăng nhập xem chi tiết có thể ảnh hưởng phiên của worker.</div>' : ""}<div id="detail-status">${spinner("Đang đăng nhập vào LMS…")}</div><div id="detail-content" hidden><section class="run-plan-panel"><div class="run-plan-heading"><div><h3>KPI hôm nay (giây)</h3><p class="run-plan-summary" id="daily-kpi-result" role="status" aria-live="polite">Chưa kiểm tra.</p></div><button type="button" class="button small" id="check-daily-kpi">${icon("refresh")}Kiểm tra KPI 1 ngày</button></div></section><div class="plan-toolbar"><label>Chương trình học<select id="plan-select"><option value="">Chọn chương trình học…</option></select></label><button class="button" id="more-plans" hidden>Tải thêm chương trình</button></div><div class="course-progress-heading"><div><h3>Tiến độ học tập</h3><p>Điểm đạt / Điểm tối đa</p></div><div class="course-progress-legend"><span class="is-passed">Đạt</span><span class="is-failed">Chưa đạt</span></div></div><div id="course-progress-placeholder" class="course-progress-placeholder" role="status">Chọn một chương trình để xem tiến độ học tập.</div><div id="course-progress" hidden></div><div class="pagination modal-pagination" id="course-pagination" hidden><span id="course-page">Trang 1</span><div><button class="button small" id="course-prev">← Trang trước</button><button class="button small" id="course-next">Trang sau →</button></div></div></div><div id="detail-error" class="inline-error" role="alert" hidden></div><button class="button" id="retry-login" hidden>Đăng nhập lại</button></div>`,
+    { viewport: true },
   );
   const modal = {
     type: "details",
@@ -764,7 +765,6 @@ async function details(account) {
     planPage: 0,
     coursePage: 1,
     request: 0,
-    raw: null,
   };
   state.modal = modal;
   const current = () => state.modalEpoch === epoch;
@@ -817,37 +817,38 @@ async function details(account) {
     $("#more-plans").hidden = !result.pagination.hasMore;
     $("#plan-select").disabled = !modal.plans.length;
     if (!modal.plans.length)
-      $("#json-placeholder").textContent =
+      $("#course-progress-placeholder").textContent =
         "Tài khoản chưa có chương trình học.";
+    else if (!selected && !$("#course-progress-placeholder").hidden)
+      $("#course-progress-placeholder").textContent =
+        "Chọn một chương trình để xem tiến độ học tập.";
   }
   async function courses() {
     const id = $("#plan-select").value,
       request = ++modal.request;
     modal.controller?.abort();
     modal.controller = new AbortController();
-    modal.raw = null;
-    $("#raw-json").hidden = true;
-    $("#copy-json").disabled = true;
+    $("#course-progress").hidden = true;
+    $("#course-progress").innerHTML = "";
     $("#course-pagination").hidden = true;
+    $("#retry-login").hidden = true;
     errorBox("#detail-error", "");
-    $("#json-placeholder").hidden = false;
+    $("#course-progress-placeholder").hidden = false;
     if (!id) {
-      $("#json-placeholder").textContent =
-        "Chọn một chương trình để xem phản hồi danh sách khóa học.";
+      $("#course-progress-placeholder").textContent =
+        "Chọn một chương trình để xem tiến độ học tập.";
       return;
     }
-    $("#json-placeholder").innerHTML = spinner("Đang đọc danh sách khóa học…");
+    $("#course-progress-placeholder").innerHTML = spinner("Đang đọc tiến độ học tập…");
     try {
       const result = await api(
         `/api/accounts/${account.id}/enrolment-plans/${id}/courses?page=${modal.coursePage}&pageSize=20`,
         { sessionId: modal.sessionId, signal: modal.controller.signal },
       );
       if (!current() || modal.request !== request) return;
-      modal.raw = JSON.stringify(result.data.rawResponse, null, 2);
-      $("#raw-json").textContent = modal.raw;
-      $("#raw-json").hidden = false;
-      $("#json-placeholder").hidden = true;
-      $("#copy-json").disabled = false;
+      $("#course-progress").innerHTML = renderCourseProgress(result.data.rawResponse);
+      $("#course-progress").hidden = false;
+      $("#course-progress-placeholder").hidden = true;
       $("#course-pagination").hidden = false;
       $("#course-page").textContent = `Trang ${modal.coursePage}`;
       $("#course-prev").disabled = modal.coursePage <= 1;
@@ -860,8 +861,8 @@ async function details(account) {
       )
         return;
       errorBox("#detail-error", error.message);
-      $("#json-placeholder").textContent =
-        "Không tải được phản hồi. Chọn lại chương trình để thử lại.";
+      $("#course-progress-placeholder").textContent =
+        "Không tải được tiến độ học tập. Chọn lại chương trình để thử lại.";
       $("#retry-login").hidden = false;
     }
   }
@@ -887,14 +888,6 @@ async function details(account) {
     modal.coursePage++;
     courses();
   };
-  $("#copy-json").onclick = async () => {
-    try {
-      await navigator.clipboard.writeText(modal.raw);
-      toast("Đã sao chép JSON.");
-    } catch {
-      toast("Trình duyệt không cho phép sao chép.", true);
-    }
-  };
   try {
     const result = await api(`/api/accounts/${account.id}/lms/session`, {
       method: "POST",
@@ -911,13 +904,13 @@ async function details(account) {
       `${account.identityNumber} · ${providerName(account.provider)} · ${result.data.user.displayName}`;
     $("#detail-status").hidden = true;
     $("#detail-content").hidden = false;
-    $("#json-placeholder").innerHTML = spinner("Đang đọc chương trình học…");
+    $("#course-progress-placeholder").innerHTML = spinner("Đang đọc chương trình học…");
     try {
       await plans();
     } catch (error) {
       if (current()) {
         errorBox("#detail-error", error.message);
-        $("#json-placeholder").textContent =
+        $("#course-progress-placeholder").textContent =
           "Không tải được danh sách chương trình học.";
         $("#retry-login").hidden = false;
       }

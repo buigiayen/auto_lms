@@ -96,6 +96,10 @@ test('HTTP account, log, status, proxy and LMS modal flow work end to end withou
     return { status: response.status, body: response.status === 204 ? null : await response.json() };
   }
   try {
+    const progressModule = await fetch(origin + '/course-progress.js');
+    assert.equal(progressModule.status, 200);
+    assert.match(progressModule.headers.get('content-type'), /text\/javascript/);
+    assert.match(await progressModule.text(), /export function renderCourseProgress/);
     const create = await call('/api/accounts', { method: 'POST', body: input }); assert.equal(create.status, 201);
     const account = create.body.data, id = account.id;
     await t.test('list, duplicate detection, edit and status', async () => {

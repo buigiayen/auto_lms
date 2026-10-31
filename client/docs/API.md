@@ -352,7 +352,7 @@ API LMS cần URL trang học làm ngữ cảnh request; client dùng `110` như
 `CheckingTimeService` hiện tại. Tổng KPI là theo người dùng/ngày, không lấy
 IID chương trình học làm IID khóa học.
 
-## 8. Chọn chương trình và xem khóa học raw
+## 8. Chọn chương trình và xem tiến độ khóa học
 
 `GET /api/accounts/:accountId/enrolment-plans?page=1&pageSize=12`, kèm header phiên.
 
@@ -404,6 +404,22 @@ các trường và cấu trúc. Không chuyển qua DTO chỉ chứa `result`, k
 `children` trước khi trả về modal. `hasMore` áp dụng quy tắc như danh sách
 chương trình; trường hợp đủ đúng một trang có thể cần gọi trang kế tiếp để xác
 nhận hết dữ liệu.
+
+Modal chi tiết chuyển `rawResponse.result` thành bảng tiến độ. Mỗi phần tử là
+một cột có tiêu đề `name`. Các hàng ghép theo tên tiêu chí trong
+`course.__expand.score_by_rubric.score_by_rubrik`, hiển thị `score / max_score`.
+`passed=1` tô xanh, giá trị khác tô đỏ; thiếu tiêu chí, `score` hoặc `max_score`
+thì để trống ô. Giá trị 0 hợp lệ, không bị thay bằng ô trống. Phần tử
+không có course hoặc bài con vẫn giữ cột tiêu đề trống điểm. Node có `children`
+hoặc `course.children` không rỗng được thay bằng các cột bài con, xử lý đệ quy;
+tiêu đề nhóm nằm phía trên tên bài con. Không còn vùng JSON hoặc nút sao chép
+trong UI. Modal chi tiết chiếm 99% chiều rộng và chiều cao viewport.
+
+Nếu `course.__expand.score_by_rubric.passed=1` (hoặc đường dẫn tương đương
+`course._expand.syllabus.score_by_rubic.passed`), UI ưu tiên tô xanh toàn bộ
+cột, gồm tiêu đề và ô trống; không xét `passed` của từng tiêu chí. Điểm hiển
+thị vẫn giữ nguyên, không tự điền điểm vào ô thiếu dữ liệu. Với cột bài con,
+trạng thái hoàn thành lấy từ course của chính bài con.
 
 `DELETE /api/accounts/:accountId/lms/session`, kèm header phiên, trả `204`.
 Chỉ xóa phiên local và cookie jar backend; không tự gọi `/user/logout` của LMS.
